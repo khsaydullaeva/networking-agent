@@ -19,6 +19,16 @@ FALLBACK_QUESTS = {
 
 
 async def generate_quests(person: dict, enrichment: dict, met_context: dict, user_goals: list[str]) -> dict:
+    # With no facts to cite, the quest-gen prompt's hard rule ("why_now
+    # must reference a specific fact") leaves the LLM nothing to write —
+    # it correctly returns zero quests rather than inventing a reason.
+    # That's right for the LLM, wrong for the product: every connection
+    # should still get something actionable, so skip straight to the
+    # generic fallback instead of spending a call on a foregone empty
+    # result.
+    if not enrichment.get("facts"):
+        return FALLBACK_QUESTS
+
     llm = get_llm()
     return await with_one_retry(
         lambda: llm.generate_json(

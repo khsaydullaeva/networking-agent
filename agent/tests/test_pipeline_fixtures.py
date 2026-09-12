@@ -75,6 +75,21 @@ async def test_no_links_means_no_facts():
     assert result["facts"] == []
 
 
+@pytest.mark.anyio
+async def test_no_facts_still_yields_a_fallback_quest():
+    """Zero facts (no links, or links that couldn't be fetched) must not
+    leave the connection with nothing to do -- regression test for the
+    dead-end screen this produced before the fallback in quests.py."""
+    result = await quests.generate_quests(
+        person={"name": "Nobody Given Links", "org": ""},
+        enrichment={"facts": []},
+        met_context={"context_type": "other"},
+        user_goals=[],
+    )
+    assert len(result["quests"]) == 1
+    assert result["quests"][0]["action_type"] == "message"
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
