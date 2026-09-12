@@ -11,10 +11,11 @@ async def enrich_and_generate_quests(
     person: {"name": str, "org": str, "links": {...}}
     met_context: {"lat": float, "lng": float, "place_label": str,
                   "ts": str, "context_type": str}
-    notes: list[str] (typed or transcribed voice notes; currently unused by
-           the pipelines below but threaded through for future prompts)
+    notes: list[str] (typed or transcribed voice notes) -- fed into quest
+           generation so a stated plan or commitment ("meet 2pm Monday")
+           can ground a quest even without any enrichment facts
     user_goals: list[str]
     """
     enrichment = await enrich(person, met_context)
-    quest_result = await generate_quests(person, enrichment, met_context, user_goals)
+    quest_result = await generate_quests(person, enrichment, met_context, user_goals, notes)
     return {"enrichment": enrichment, "quests": quest_result["quests"]}

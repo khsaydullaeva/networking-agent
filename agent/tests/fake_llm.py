@@ -34,6 +34,7 @@ class FakeLLMProvider(LLMProvider):
 
             payload = _json.loads(user_prompt)
             facts = payload["facts"]
+            notes = payload.get("notes", [])
             quests = []
             for f in facts[:3]:
                 quests.append(
@@ -45,6 +46,17 @@ class FakeLLMProvider(LLMProvider):
                         "due_days": 5,
                     }
                 )
+            if not quests:
+                for n in notes[:3]:
+                    quests.append(
+                        {
+                            "title": f"Follow up on: {n[:40]}",
+                            "why_now": f"You noted: {n}",
+                            "action_type": "meet",
+                            "draft_message": None,
+                            "due_days": 3,
+                        }
+                    )
             return {"quests": quests}
 
         raise ValueError(f"FakeLLMProvider doesn't know how to handle schema: {schema}")

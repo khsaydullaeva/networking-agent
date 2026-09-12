@@ -90,6 +90,23 @@ async def test_no_facts_still_yields_a_fallback_quest():
     assert result["quests"][0]["action_type"] == "message"
 
 
+@pytest.mark.anyio
+async def test_notes_alone_ground_a_quest_without_any_facts():
+    """A contact with no shared links (so no enrichment facts) but a note
+    like a meeting commitment should still get a real, specific quest --
+    not the generic fallback -- because notes are a valid citation source
+    now too (agent/prompts.py QUEST_GEN_PROMPT)."""
+    result = await quests.generate_quests(
+        person={"name": "Harsh", "org": ""},
+        enrichment={"facts": []},
+        met_context={"context_type": "conference"},
+        user_goals=[],
+        notes=["do robotics project together, meet 2pm Monday"],
+    )
+    assert len(result["quests"]) == 1
+    assert "robotics" in result["quests"][0]["why_now"].lower()
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"

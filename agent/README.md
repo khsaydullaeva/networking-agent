@@ -260,13 +260,17 @@ QUEST_SCHEMA = {
     "required": ["quests"],
 }
 
-async def generate_quests(person, enrichment, met_context, user_goals) -> dict:
+async def generate_quests(person, enrichment, met_context, user_goals, notes=None) -> dict:
+    facts, notes = enrichment["facts"], notes or []
+    if not facts and not notes:
+        return FALLBACK_QUESTS  # nothing to cite, don't spend a call on a foregone empty result
+
     llm = get_llm()
     try:
         return await llm.generate_json(
             system_prompt=QUEST_GEN_PROMPT,  # see prompt requirements below
             user_prompt=json.dumps({
-                "person": person, "facts": enrichment["facts"],
+                "person": person, "facts": facts, "notes": notes,
                 "met_context": met_context, "user_goals": user_goals,
             }),
             schema=QUEST_SCHEMA,
@@ -277,13 +281,24 @@ async def generate_quests(person, enrichment, met_context, user_goals) -> dict:
 
 **Prompt must enforce this hard rule — it is the entire product
 differentiator:** every `why_now` must reference a specific item from
-`facts`, not a generic prompt like "reach out and reconnect." Include one
-accepted and one rejected example directly in the system prompt:
+`facts` **or** a specific detail from `notes` (the user's typed/voice
+notes about meeting this person — a plan, a commitment, a topic), not a
+generic prompt like "reach out and reconnect." Include one accepted-per-
+source and one rejected example directly in the system prompt:
 
 - ❌ Rejected: "Ask her about her research."
-- ✅ Accepted: "Her paper on sparse routing (posted 3 weeks ago) relates
-  directly to the inference problem you discussed at the career fair —
-  ask how her approach compares."
+- ✅ Accepted (from a fact): "Her paper on sparse routing (posted 3 weeks
+  ago) relates directly to the inference problem you discussed at the
+  career fair — ask how her approach compares."
+- ✅ Accepted (from a note): the note says "meet 2pm Monday for the
+  robotics project" — a `meet` quest whose why_now is "You already agreed
+  to meet Monday at 2pm to start the robotics project."
+
+Notes matter because a contact often has **no enrichment facts at all**
+(no links shared, or links that couldn't be fetched — see §3) but does
+have a concrete note like a meeting time. Without notes as a valid
+citation source, that connection would get nothing but the generic
+fallback quest even though the user wrote down an exact plan.
 
 If the model produces vague quests during testing, tighten this example
 set before touching anything else — this is worth more debugging time

@@ -28,10 +28,15 @@ shared contract between them is the API spec and data model below.
    - fetches the profile links shared for the new contact (LinkedIn,
      Instagram, Facebook, ... — no general web search by name),
    - extracts facts with a source URL attached to each one,
-   - generates 2–3 concrete, dated follow-up quests.
+   - generates 2–3 concrete, dated follow-up quests, grounded in those
+     facts **or** in a specific detail from the connection's notes (a
+     meeting time, a plan) when there are no facts to work with.
 4. Quests render as cards (`message` / `read` / `meet` / `share`) on the
-   phone. Completing one awards XP and brightens that contact's node on a
-   network map. Uncompleted contacts visually dim over time ("warmth decay").
+   phone. Completing one — and adding a connection in the first place —
+   awards XP and increments a daily streak, with a celebration animation
+   on both, not just a number changing in place. Completing a quest also
+   brightens that contact's node on a network map; uncompleted contacts
+   visually dim over time ("warmth decay").
 
 **Explicitly out of scope for MVP** (say "post-MVP" if asked, don't build):
 calendar OAuth integration, the app sending messages on the user's behalf,
@@ -44,7 +49,7 @@ before cutting these:
 - Live two-phone exchange (not a single-player form).
 - Every enrichment fact is traceable to a `source_url`; unsourced facts are
   dropped, not shown.
-- Warmth decay is a deterministic formula, not an LLM call.
+- Warmth decay and XP/streaks are deterministic formulas, not an LLM call.
 
 ---
 
@@ -93,7 +98,8 @@ before cutting these:
   ],
   "links": { "linkedin": "url", "github": "url", "twitter": "url" },
   "xp": 0,
-  "streak": 0
+  "streak": 0,               // consecutive UTC days with 1+ XP-awarding action
+  "last_activity_date": "YYYY-MM-DD | null"   // drives streak, see backend/README §5
 }
 
 // connections
@@ -153,7 +159,7 @@ Full JSON Schemas for what the agent must return live in `agent/README.md`.
 | `BACKEND_URL` | mobile | e.g. `http://<laptop-ip>:8000` for Expo Go on physical devices |
 | `LLM_PROVIDER` | agent | `k2` \| `gemini` \| `grok` — see `agent/README.md` |
 | `LLM_API_KEY` | agent | key for whichever provider is active |
-| `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` | mobile, backend | sign up / log in — works out of the box with Auth0's default email/password connection, see backend/README §6 |
+| `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` | mobile, backend | sign up / log in — works out of the box with Auth0's default email/password connection, see backend/README §7 |
 | `ELEVENLABS_API_KEY` | backend or agent | optional, daily quest voice briefing |
 
 ---
