@@ -184,8 +184,11 @@ def test_list_connections_by_owner(client):
     assert len(resp.json()) == 2
 
 
-def test_complete_quest_awards_xp(client):
+def test_connection_and_quest_completion_both_award_xp_and_streak(client):
     user = client.post("/users", json={"name": "Eve", "goals": [], "links": {}}).json()
+    assert user["xp"] == 0
+    assert user["streak"] == 0
+
     conn = client.post(
         "/connections",
         json={
@@ -195,6 +198,12 @@ def test_complete_quest_awards_xp(client):
             "notes": [],
         },
     ).json()
+    # adding a connection is itself an XP-awarding, streak-starting action
+    assert conn["xp_awarded"] > 0
+    assert conn["new_total_xp"] == conn["xp_awarded"]
+    assert conn["streak"] == 1
+    xp_after_connection = conn["new_total_xp"]
+
     quest_id = conn["quests"][0]["id"] if "quests" in conn else client.get(f"/connections/{conn['id']}").json()["quests"][0]["id"]
 
     resp = client.post(f"/quests/{quest_id}/complete")
@@ -202,7 +211,10 @@ def test_complete_quest_awards_xp(client):
     body = resp.json()
     assert body["quest"]["status"] == "completed"
     assert body["xp_awarded"] > 0
-    assert body["new_total_xp"] == body["xp_awarded"]
+    # stacks on top of the connection-creation XP, doesn't replace it
+    assert body["new_total_xp"] == xp_after_connection + body["xp_awarded"]
+    # same UTC day as the connection -> streak doesn't double-increment
+    assert body["streak"] == 1
 
     # completing twice should fail cleanly
     resp2 = client.post(f"/quests/{quest_id}/complete")

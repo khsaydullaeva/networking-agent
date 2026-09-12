@@ -8,6 +8,7 @@ from .agent_client import enrich_and_generate_quests
 from .auth import verify_token
 from .db import get_db, serialize
 from .demo_fixtures import DEMO_ENRICHMENT, DEMO_QUESTS
+from .gamification import CONNECTION_XP, award_xp
 from .models import ConnectionCreate, LinkQuestToPlan, Links, PlanCreate, UserCreate
 from .warmth import warmth_for_connection
 
@@ -186,6 +187,14 @@ async def create_connection(body: ConnectionCreate, background_tasks: Background
 
     result = serialize(doc)
     result["warmth"] = warmth_for_connection(doc)
+
+    # Adding a connection is itself an XP-awarding, streak-building action
+    # -- "the score goes up when you leave the app" starts here, not only
+    # at quest completion.
+    xp_result = await award_xp(db, body.owner_id, CONNECTION_XP)
+    if xp_result:
+        result.update(xp_result)
+
     return result
 
 
@@ -250,14 +259,9 @@ async def complete_quest(quest_id: str):
     await db.quests.update_one({"_id": quest_id}, {"$set": {"status": "completed"}})
     await db.connections.update_one({"_id": quest["connection_id"]}, {"$set": {"last_touch": now_iso()}})
 
-    user = await db.users.find_one({"_id": quest["owner_id"]})
-    new_total_xp = (user["xp"] if user else 0) + quest["xp"]
-    if user is not None:
-        await db.users.update_one({"_id": quest["owner_id"]}, {"$set": {"xp": new_total_xp}})
+    xp_result = await award_xp(db, quest["owner_id"], quest["xp"])
 
     updated_quest = await db.quests.find_one({"_id": quest_id})
-    return {
-        "quest": serialize(updated_quest),
-        "xp_awarded": quest["xp"],
-        "new_total_xp": new_total_xp,
-    }
+    result = {"quest": serialize(updated_quest)}
+    result.update(xp_result or {"xp_awarded": quest["xp"], "new_total_xp": quest["xp"], "streak": 0})
+    return result

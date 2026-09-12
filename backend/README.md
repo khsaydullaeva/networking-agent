@@ -161,7 +161,36 @@ less than the decay being visible on stage.
 
 ---
 
-## 5. Demo-mode safety net
+## 5. Gamification — XP and streaks, deterministic
+
+`app/gamification.py`. Same philosophy as warmth: no LLM call, a plain
+formula. Two XP-awarding actions today:
+
+- Creating a connection (`POST /connections`) → `CONNECTION_XP` (5)
+- Completing a quest (`POST /quests/:id/complete`) → that quest's `xp`
+  field (10 by default)
+
+Both call the shared `award_xp(db, user_id, xp)` helper, which also
+updates `streak`: consecutive **UTC calendar days** with at least one
+XP-awarding action. A second action on the same day doesn't double-count;
+a gap of 2+ days resets the streak to 1 rather than to 0 (the day you come
+back and do something is itself day 1 of a new streak). This needs
+`User.last_activity_date` (an ISO date string) to know what day the
+streak was last extended.
+
+Every endpoint that calls `award_xp` returns `{"xp_awarded", "new_total_xp",
+"streak"}` merged into its response — `mobile/` uses this to drive an XP
+popup animation (`components/CelebrationPopup.tsx`) rather than just
+updating a number in place, on **both** actions, not only quest
+completion.
+
+`award_xp` returns `None` if the user doesn't exist (the stale-session
+case from a backend restart on the in-memory store — see
+`mobile/lib/session.ts`); callers degrade gracefully rather than 500.
+
+---
+
+## 6. Demo-mode safety net
 
 Add `DEMO_MODE` env var. When true, `/connections` and `/quests` skip the
 real agent call entirely and return pre-written fixture enrichment/quests
@@ -171,7 +200,7 @@ before you go on stage.
 
 ---
 
-## 6. Auth0 — sign up / log in, then add profile links manually
+## 7. Auth0 — sign up / log in, then add profile links manually
 
 `app/auth.py`'s `verify_token` dependency verifies an Auth0-issued ID
 token (RS256, signature checked against `https://$AUTH0_DOMAIN/.well-known/jwks.json`,
@@ -205,7 +234,7 @@ per-request authorization beyond "the client already logged in once."
 
 ---
 
-## 7. Acceptance checklist for this layer
+## 8. Acceptance checklist for this layer
 
 - [ ] `POST /connections` returns immediately (< 500ms) while enrichment
       happens in the background
@@ -218,3 +247,6 @@ per-request authorization beyond "the client already logged in once."
 - [ ] Reachable from a physical phone on the same wifi network as your
       laptop (test this explicitly — `localhost` bindings are a common trap)
 - [ ] Agent failures degrade to a fallback quest, never a 500 to mobile
+- [ ] Creating a connection and completing a quest both return
+      `xp_awarded`/`new_total_xp`/`streak`, and two actions on the same
+      UTC day don't double-increment the streak

@@ -12,6 +12,7 @@ import {
   useAudioRecorderState,
 } from "expo-audio";
 
+import { CelebrationPopup } from "@/components/CelebrationPopup";
 import { createConnection } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import type { ContextType, MetContext } from "@/lib/types";
@@ -20,7 +21,7 @@ const CONTEXT_TYPES: ContextType[] = ["conference", "club", "orientation", "camp
 
 export default function CaptureContext() {
   const router = useRouter();
-  const { user, pendingConnect, setPendingConnect } = useStore();
+  const { user, setUser, pendingConnect, setPendingConnect } = useStore();
   const [placeLabel, setPlaceLabel] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [contextType, setContextType] = useState<ContextType>("conference");
@@ -29,6 +30,7 @@ export default function CaptureContext() {
   const recorderState = useAudioRecorderState(recorder);
   const [voiceNoteUri, setVoiceNoteUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [celebration, setCelebration] = useState<{ xp: number; streak: number; connectionId: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -76,11 +78,18 @@ export default function CaptureContext() {
         met,
         notes,
       });
-      setPendingConnect(null);
-      router.replace(`/connection/${connection.id}`);
+      setUser({ ...user, xp: connection.new_total_xp, streak: connection.streak });
+      setCelebration({ xp: connection.xp_awarded, streak: connection.streak, connectionId: connection.id });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCelebrationDone = () => {
+    if (!celebration) return;
+    setPendingConnect(null);
+    router.replace(`/connection/${celebration.connectionId}`);
+    setCelebration(null);
   };
 
   if (!user) return <Redirect href="/login" />;
@@ -98,6 +107,13 @@ export default function CaptureContext() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
+      <CelebrationPopup
+        visible={!!celebration}
+        xp={celebration?.xp ?? 0}
+        streak={celebration?.streak ?? 0}
+        label="New connection!"
+        onDone={handleCelebrationDone}
+      />
       <ScrollView className="px-6 pt-8" contentContainerStyle={{ paddingBottom: 32 }}>
         <Text className="text-2xl font-bold text-gray-900 mb-1">
           Met {pendingConnect.person.name}
@@ -150,7 +166,7 @@ export default function CaptureContext() {
           </Text>
         </Pressable>
 
-        <Pressable disabled={submitting} className="bg-orange-500 rounded-xl py-4 items-center" onPress={handleSubmit}>
+        <Pressable disabled={submitting || !!celebration} className="bg-orange-500 rounded-xl py-4 items-center" onPress={handleSubmit}>
           <Text className="text-white font-semibold text-base">{submitting ? "Saving..." : "Save connection"}</Text>
         </Pressable>
       </ScrollView>

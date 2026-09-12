@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { CelebrationPopup } from "@/components/CelebrationPopup";
 import { QuestCard } from "@/components/QuestCard";
 import { completeQuest, getConnection } from "@/lib/api";
 import { useStore } from "@/lib/store";
@@ -21,6 +22,7 @@ export default function ConnectionDetail() {
   const router = useRouter();
   const { user, setUser } = useStore();
   const [connection, setConnection] = useState<Connection | null>(null);
+  const [celebration, setCelebration] = useState<{ xp: number; streak: number } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -45,8 +47,9 @@ export default function ConnectionDetail() {
   }, [refresh]);
 
   const handleCompleteQuest = async (questId: string) => {
-    const { new_total_xp } = await completeQuest(questId);
-    if (user) setUser({ ...user, xp: new_total_xp });
+    const { xp_awarded, new_total_xp, streak } = await completeQuest(questId);
+    if (user) setUser({ ...user, xp: new_total_xp, streak });
+    setCelebration({ xp: xp_awarded, streak });
     await refresh();
   };
 
@@ -64,6 +67,13 @@ export default function ConnectionDetail() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
+      <CelebrationPopup
+        visible={!!celebration}
+        xp={celebration?.xp ?? 0}
+        streak={celebration?.streak ?? 0}
+        label="Quest complete!"
+        onDone={() => setCelebration(null)}
+      />
       <ScrollView className="px-6 pt-6" contentContainerStyle={{ paddingBottom: 32 }}>
         <Pressable onPress={() => router.push("/map")} className="mb-4">
           <Text className="text-orange-600">{"< Map"}</Text>

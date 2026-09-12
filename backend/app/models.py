@@ -42,6 +42,7 @@ class User(BaseModel):
     auth0_id: str | None = None
     xp: int = 0
     streak: int = 0
+    last_activity_date: str | None = None
 
 
 class Person(BaseModel):

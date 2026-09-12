@@ -73,8 +73,8 @@ classic multi-hour time sink.
    - `read`: shows the source link, a "Mark read" button
    - `meet`: shows a suggested date, a "Mark done" button
    - `share`: shows what to share, a "Mark done" button
-   Completing any quest → call `POST /quests/:id/complete` → play the XP
-   animation (see §4) → navigate back to the map.
+   Completing any quest → call `POST /quests/:id/complete` → show the
+   celebration popup (see §4a) → navigate back to the map.
 7. **Network map** (tab: "Map" — the demo centerpiece — give this the
    most polish time) — see §4.
 8. **Dashboard** (tab: "Dashboard") — your plans, and the feed of every
@@ -126,10 +126,33 @@ This single screen carries the most weight in judging ("demo quality" +
   grey, 1 = full color). This is the visual proof of the "score goes up
   when you leave the app" pitch — do not skip the dimming animation.
 - Tapping a node opens Connection detail.
-- Completing a quest: node animates from dim → bright, small XP number
-  floats up, streak counter increments in a corner HUD.
+- Completing a quest: node animates from dim → bright (warmth changed
+  server-side, see backend/README.md §4) once you're back on this screen.
 - Use `react-native-svg` or `react-native-reanimated` for the animations.
   Keep it to one well-polished map rather than several mediocre charts.
+
+---
+
+## 4a. Gamification — XP + streak celebration, not just a number changing
+
+Two actions award XP and update the streak (backend/README.md §5,
+deterministic, no LLM): **adding a connection** and **completing a
+quest**. Both responses carry `{xp_awarded, new_total_xp, streak}`
+(`lib/types.ts` `GamificationResult`) — every screen that triggers one of
+these calls `setUser({...user, xp: new_total_xp, streak})` immediately
+so XP/streak are correct everywhere in the app (Map header, Profile) the
+instant it happens, not just where the action occurred.
+
+`components/CelebrationPopup.tsx` is the actual "gamified, not just
+incrementing" part: a pop-in/hold/pop-out card ("+X XP", streak with 🔥)
+using `Animated` (no extra dependency). Wired into:
+- `app/capture.tsx` — after `createConnection`, holds `pendingConnect`
+  until the popup finishes, *then* navigates to Connection detail (so the
+  form stays visible underneath instead of flashing to an empty state)
+- `app/connection/[id].tsx` — after `completeQuest`
+
+Reuse this component for any future XP-awarding action rather than
+building a second celebration UI.
 
 ---
 
@@ -157,7 +180,7 @@ varied warmth levels (some at 0.9, some at 0.2) so the map never looks
 empty during development or if live demo data is thin. Toggle fixtures vs.
 live API with a single `USE_FIXTURES` constant — flip it off once
 `backend/` is confirmed reachable, flip it back on as your demo-mode
-safety net (coordinate with `backend/README.md` §5 `DEMO_MODE`).
+safety net (coordinate with `backend/README.md` §6 `DEMO_MODE`).
 
 ---
 
@@ -220,3 +243,8 @@ testing plans/dashboard/connect without a live Auth0 tenant at all.
       person you connect with
 - [ ] All four tabs (Dashboard, Profile, Scan QR, Map) are reachable from
       the bottom tab bar at all times once logged in
+- [ ] The celebration popup fires with a real animation (not an instant
+      number change) both when adding a connection and when completing a
+      quest, showing the correct XP and streak each time
+- [ ] A note with a concrete plan (e.g. "meet 2pm Monday") produces a
+      specific quest even when the contact has no enrichment facts at all

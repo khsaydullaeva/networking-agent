@@ -1,7 +1,9 @@
 import { BACKEND_URL, USE_FIXTURES } from "@/lib/config";
 import { seedConnections } from "@/lib/fixtures/seedConnections";
 import { seedQuests } from "@/lib/fixtures/seedQuests";
-import type { Connection, Links, Plan, Quest, User } from "@/lib/types";
+import type { Connection, GamificationResult, Links, Plan, Quest, User } from "@/lib/types";
+
+const FIXTURE_CONNECTION_XP = 5;
 
 // mobile/ never calls the agent directly — only backend/, over REST.
 // USE_FIXTURES lets every screen work before backend/ is reachable, and
@@ -51,6 +53,13 @@ let fixtureUser: User = {
 // is visible for the rest of the fixture session
 const fixtureConnections: Connection[] = seedConnections.map((c) => ({ ...c }));
 const fixtureQuests: Record<string, Quest[]> = JSON.parse(JSON.stringify(seedQuests));
+
+// Fixture-mode stand-in for backend/app/gamification.py's next_streak() —
+// good enough for a demo session, not meant to model real day gaps.
+function awardFixtureXp(xp: number): GamificationResult {
+  fixtureUser = { ...fixtureUser, xp: fixtureUser.xp + xp, streak: fixtureUser.streak + 1 };
+  return { xp_awarded: xp, new_total_xp: fixtureUser.xp, streak: fixtureUser.streak };
+}
 
 // In USE_FIXTURES mode, login is instant and doesn't need a real Auth0
 // token — this is a dev/demo convenience, not a security boundary.
@@ -125,7 +134,7 @@ export async function createConnection(input: {
   person: Connection["person"];
   met: Connection["met"];
   notes: string[];
-}): Promise<Connection> {
+}): Promise<Connection & GamificationResult> {
   if (USE_FIXTURES) {
     const conn: Connection = {
       id: `local-${Date.now()}`,
@@ -162,9 +171,12 @@ export async function createConnection(input: {
         },
       ];
     }, 2000);
-    return conn;
+    return { ...conn, ...awardFixtureXp(FIXTURE_CONNECTION_XP) };
   }
-  return request<Connection>("/connections", { method: "POST", body: JSON.stringify(input) });
+  return request<Connection & GamificationResult>("/connections", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function getConnection(id: string): Promise<Connection> {
@@ -183,9 +195,7 @@ export async function listConnections(ownerId: string): Promise<Connection[]> {
   return request<Connection[]>(`/connections?owner_id=${encodeURIComponent(ownerId)}`);
 }
 
-export async function completeQuest(
-  questId: string
-): Promise<{ quest: Quest; xp_awarded: number; new_total_xp: number }> {
+export async function completeQuest(questId: string): Promise<{ quest: Quest } & GamificationResult> {
   if (USE_FIXTURES) {
     for (const list of Object.values(fixtureQuests)) {
       const quest = list.find((q) => q.id === questId);
@@ -196,8 +206,7 @@ export async function completeQuest(
           conn.warmth = Math.min(1, conn.warmth + 0.3);
           conn.last_touch = new Date().toISOString();
         }
-        fixtureUser = { ...fixtureUser, xp: fixtureUser.xp + quest.xp };
-        return { quest, xp_awarded: quest.xp, new_total_xp: fixtureUser.xp };
+        return { quest, ...awardFixtureXp(quest.xp) };
       }
     }
     throw new Error("quest not found");

@@ -80,3 +80,11 @@ export interface Connection {
   last_touch: string | null;
   quests?: Quest[];
 }
+
+// Every XP-awarding action (creating a connection, completing a quest)
+// returns this, deterministically computed by backend/app/gamification.py.
+export interface GamificationResult {
+  xp_awarded: number;
+  new_total_xp: number;
+  streak: number;
+}
