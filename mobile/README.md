@@ -52,9 +52,10 @@ classic multi-hour time sink.
 3. **Connect** — big QR code (encodes your `user_id`, `name`, and `links`
    — including whatever social links you've added on the dashboard) + a
    "Scan" button that opens the camera. Below the QR, show the 6-digit
-   fallback code and inputs to type the other person's code, name, and
-   LinkedIn/Instagram/Facebook URLs (camera-under-stage-lights fallback —
-   do not skip this).
+   fallback code and inputs to type the other person's code and name
+   (camera-under-stage-lights fallback — do not skip this). No manual
+   link entry here — scanning their QR is the only way their profile
+   links come through; the manual fallback trades that off for speed.
 4. **Capture context** — appears immediately after a successful connect.
    Auto-fills GPS → place label (reverse geocode or just show raw
    coords + let user label it "Career Fair") and timestamp. One text
@@ -194,8 +195,8 @@ testing plans/dashboard/connect without a live Auth0 tenant at all.
 - [ ] Session persists across an app restart (no re-login needed)
 - [ ] A first-time login with zero plans is routed to `/plans-setup`
       before `/map`
-- [ ] The other person's profile links (from the QR payload or typed
-      manually) show as tappable links on Connection detail
+- [ ] The other person's profile links (from scanning their QR) show as
+      tappable links on Connection detail
 - [ ] Dashboard lists every pending task across all connections, and
       linking one to a plan persists (reload and it's still linked)
 - [ ] Saving your own links on the dashboard persists (reload and

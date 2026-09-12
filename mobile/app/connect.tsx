@@ -15,9 +15,6 @@ export default function Connect() {
   const [scanning, setScanning] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualCode, setManualCode] = useState("");
-  const [manualLinkedin, setManualLinkedin] = useState("");
-  const [manualInstagram, setManualInstagram] = useState("");
-  const [manualFacebook, setManualFacebook] = useState("");
   const [permission, requestPermission] = useCameraPermissions();
 
   const [fallbackCode] = useState(generateFallbackCode());
@@ -40,11 +37,7 @@ export default function Connect() {
 
   const handleManualSubmit = () => {
     if (!manualName.trim() || manualCode.length !== 6) return;
-    const links: Links = {};
-    if (manualLinkedin.trim()) links.linkedin = manualLinkedin.trim();
-    if (manualInstagram.trim()) links.instagram = manualInstagram.trim();
-    if (manualFacebook.trim()) links.facebook = manualFacebook.trim();
-    proceedWith(manualName.trim(), "", links);
+    proceedWith(manualName.trim(), "", {});
   };
 
   if (scanning) {
@@ -91,7 +84,7 @@ export default function Connect() {
       </Pressable>
 
       <Text className="text-sm font-semibold text-gray-700 mb-2">
-        Or type their fallback code and details
+        Or type their fallback code and name
       </Text>
       <TextInput
         value={manualCode}
@@ -105,34 +98,6 @@ export default function Connect() {
         value={manualName}
         onChangeText={setManualName}
         placeholder="Their name"
-        className="border border-gray-300 rounded-xl px-4 py-3 mb-3 text-base"
-      />
-
-      <Text className="text-xs text-gray-500 mb-2">
-        Their profile links (optional) — the agent searches these directly for insights.
-      </Text>
-      <TextInput
-        value={manualLinkedin}
-        onChangeText={setManualLinkedin}
-        placeholder="LinkedIn URL"
-        autoCapitalize="none"
-        keyboardType="url"
-        className="border border-gray-300 rounded-xl px-4 py-3 mb-2 text-base"
-      />
-      <TextInput
-        value={manualInstagram}
-        onChangeText={setManualInstagram}
-        placeholder="Instagram URL"
-        autoCapitalize="none"
-        keyboardType="url"
-        className="border border-gray-300 rounded-xl px-4 py-3 mb-2 text-base"
-      />
-      <TextInput
-        value={manualFacebook}
-        onChangeText={setManualFacebook}
-        placeholder="Facebook URL"
-        autoCapitalize="none"
-        keyboardType="url"
         className="border border-gray-300 rounded-xl px-4 py-3 mb-4 text-base"
       />
       <Pressable
