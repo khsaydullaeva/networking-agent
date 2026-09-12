@@ -59,7 +59,7 @@ export function NetworkMap({ connections }: { connections: Connection[] }) {
         >
           <View style={{ width: 32, height: 32 }} />
           <Text numberOfLines={1} style={{ fontSize: 10, color: "#374151", marginTop: 2, maxWidth: 64 }}>
-            {conn.person.name.split(" ")[0]}
+            {(conn.person?.name || "?").split(" ")[0]}
           </Text>
         </Pressable>
       ))}

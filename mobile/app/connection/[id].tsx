@@ -59,8 +59,8 @@ export default function ConnectionDetail() {
           <Text className="text-orange-600">{"< Map"}</Text>
         </Pressable>
 
-        <Text className="text-2xl font-bold text-gray-900">{person.name}</Text>
-        {!!person.org && <Text className="text-base text-gray-500 mb-4">{person.org}</Text>}
+        <Text className="text-2xl font-bold text-gray-900">{person?.name || "Unknown"}</Text>
+        {!!person?.org && <Text className="text-base text-gray-500 mb-4">{person.org}</Text>}
 
         {!enrichment ? (
           <View className="flex-row items-center gap-2 mb-6">
