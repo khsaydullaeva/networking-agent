@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "networking-agent",
+    "slug": "networking-agent",
+    "scheme": "networkingagent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan a QR code to connect with someone you just met.",
+        "NSLocationWhenInUseUsageDescription": "Used to auto-label where you met a new connection.",
+        "NSMicrophoneUsageDescription": "Record a voice note about a new connection."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "RECORD_AUDIO"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan a QR code to connect with someone you just met."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Used to auto-label where you met a new connection."
+        }
+      ]
+    ]
+  }
+}
