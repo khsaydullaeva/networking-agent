@@ -42,6 +42,12 @@
           "locationWhenInUsePermission": "Used to auto-label where you met a new connection."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "aa0107b1-53e9-4649-8713-8b2ae652f8d2"
+      }
+    },
+    "owner": "khurshida31s-team"
   }
 }
