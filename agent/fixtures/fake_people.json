@@ -1,0 +1,57 @@
+[
+  {
+    "person": {
+      "name": "Ava Chen",
+      "org": "Carnegie Mellon University",
+      "links": { "github": "https://github.com/avachen" }
+    },
+    "known_facts": [
+      "Published a paper on sparse routing for LLM inference three weeks ago.",
+      "Maintains an open-source library for KV-cache compression."
+    ]
+  },
+  {
+    "person": {
+      "name": "Marcus Reyes",
+      "org": "Querit.ai",
+      "links": { "linkedin": "https://linkedin.com/in/marcusreyes" }
+    },
+    "known_facts": [
+      "Gave a talk last month on real-time web search APIs for agents.",
+      "Shipped a new ranking model for Querit's search endpoint."
+    ]
+  },
+  {
+    "person": {
+      "name": "Priya Nair",
+      "org": "MongoDB",
+      "links": { "twitter": "https://twitter.com/priyanair" }
+    },
+    "known_facts": [
+      "Wrote a blog post on vector search indexes in Atlas.",
+      "Spoke on a panel about database scaling for AI workloads."
+    ]
+  },
+  {
+    "person": {
+      "name": "Diego Alvarez",
+      "org": "Institute of Foundation Models",
+      "links": { "github": "https://github.com/dalvarez" }
+    },
+    "known_facts": [
+      "Released a benchmark suite comparing small vs. large model routing.",
+      "Co-authored a blog post on the K2 Horizon model fleet."
+    ]
+  },
+  {
+    "person": {
+      "name": "Sofia Kim",
+      "org": "Vultr",
+      "links": { "linkedin": "https://linkedin.com/in/sofiakim" }
+    },
+    "known_facts": [
+      "Published a guide on deploying FastAPI apps to Vultr.",
+      "Organized a campus hackathon workshop on cloud infra."
+    ]
+  }
+]
