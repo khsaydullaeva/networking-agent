@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -38,9 +38,11 @@ export default function ConnectionDetail() {
 
   const handleCompleteQuest = async (questId: string) => {
     const { new_total_xp } = await completeQuest(questId);
-    setUser({ ...user, xp: new_total_xp });
+    if (user) setUser({ ...user, xp: new_total_xp });
     await refresh();
   };
+
+  if (!user) return <Redirect href="/login" />;
 
   if (!connection) {
     return (
@@ -60,7 +62,13 @@ export default function ConnectionDetail() {
         </Pressable>
 
         <Text className="text-2xl font-bold text-gray-900">{person?.name || "Unknown"}</Text>
-        {!!person?.org && <Text className="text-base text-gray-500 mb-4">{person.org}</Text>}
+        {!!person?.org && <Text className="text-base text-gray-500">{person.org}</Text>}
+        {!!person?.links?.linkedin && (
+          <Pressable onPress={() => Linking.openURL(person.links.linkedin as string)}>
+            <Text className="text-sm text-[#0A66C2] mb-4">View LinkedIn profile</Text>
+          </Pressable>
+        )}
+        {!person?.links?.linkedin && <View className="mb-4" />}
 
         {!enrichment ? (
           <View className="flex-row items-center gap-2 mb-6">

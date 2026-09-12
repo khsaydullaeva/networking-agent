@@ -1,7 +1,7 @@
 import { BACKEND_URL, USE_FIXTURES } from "@/lib/config";
 import { seedConnections } from "@/lib/fixtures/seedConnections";
 import { seedQuests } from "@/lib/fixtures/seedQuests";
-import type { Connection, Quest, User } from "@/lib/types";
+import type { Connection, Plan, Quest, User } from "@/lib/types";
 
 // mobile/ never calls the agent or Querit directly — only backend/, over
 // REST. USE_FIXTURES lets every screen work before backend/ is reachable,
@@ -21,7 +21,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 let fixtureUser: User = {
   id: "dev-user-1",
   name: "You",
-  goals: [],
+  plans: [
+    { id: "plan-1", title: "ML internship", status: "active" },
+    { id: "plan-2", title: "Find a cofounder", status: "active" },
+  ],
   links: {},
   xp: 0,
   streak: 0,
@@ -32,14 +35,60 @@ let fixtureUser: User = {
 const fixtureConnections: Connection[] = seedConnections.map((c) => ({ ...c }));
 const fixtureQuests: Record<string, Quest[]> = JSON.parse(JSON.stringify(seedQuests));
 
-export async function createUser(name: string, goals: string[]): Promise<User> {
+// In USE_FIXTURES mode, login is instant and doesn't need a real Auth0
+// token — this is a dev/demo convenience, not a security boundary.
+export async function authSession(idToken: string): Promise<User> {
   if (USE_FIXTURES) {
-    fixtureUser = { ...fixtureUser, name, goals };
     return fixtureUser;
   }
-  return request<User>("/users", {
+  return request<User>("/auth/session", {
     method: "POST",
-    body: JSON.stringify({ name, goals, links: {} }),
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+}
+
+export async function getUser(id: string): Promise<User> {
+  if (USE_FIXTURES) {
+    return fixtureUser;
+  }
+  return request<User>(`/users/${id}`);
+}
+
+export async function addPlan(userId: string, title: string): Promise<Plan> {
+  if (USE_FIXTURES) {
+    const plan: Plan = { id: `plan-${Date.now()}`, title, status: "active" };
+    fixtureUser = { ...fixtureUser, plans: [...fixtureUser.plans, plan] };
+    return plan;
+  }
+  return request<Plan>(`/users/${userId}/plans`, {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function listQuests(ownerId: string): Promise<Quest[]> {
+  if (USE_FIXTURES) {
+    return Object.values(fixtureQuests)
+      .flat()
+      .filter((q) => q.owner_id === ownerId);
+  }
+  return request<Quest[]>(`/quests?owner_id=${encodeURIComponent(ownerId)}`);
+}
+
+export async function linkQuestToPlan(questId: string, planId: string | null): Promise<Quest> {
+  if (USE_FIXTURES) {
+    for (const list of Object.values(fixtureQuests)) {
+      const quest = list.find((q) => q.id === questId);
+      if (quest) {
+        quest.plan_id = planId;
+        return quest;
+      }
+    }
+    throw new Error("quest not found");
+  }
+  return request<Quest>(`/quests/${questId}/link-plan`, {
+    method: "POST",
+    body: JSON.stringify({ plan_id: planId }),
   });
 }
 
@@ -79,6 +128,7 @@ export async function createConnection(input: {
           why_now: "You just connected — a quick note while it's fresh keeps the door open.",
           draft_message: "Great meeting you! Would love to stay in touch.",
           status: "pending",
+          plan_id: null,
           xp: 10,
           due_at: null,
         },

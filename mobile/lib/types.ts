@@ -1,6 +1,7 @@
 export type ContextType = "conference" | "club" | "orientation" | "campus" | "work" | "other";
 export type QuestType = "message" | "read" | "meet" | "share";
 export type QuestStatus = "pending" | "completed";
+export type PlanStatus = "active" | "done";
 
 export interface Links {
   linkedin?: string;
@@ -9,11 +10,18 @@ export interface Links {
   [key: string]: string | undefined;
 }
 
+export interface Plan {
+  id: string;
+  title: string;
+  status: PlanStatus;
+}
+
 export interface User {
   id: string;
   name: string;
-  goals: string[];
+  plans: Plan[];
   links: Links;
+  auth0_id?: string | null;
   xp: number;
   streak: number;
 }
@@ -54,6 +62,7 @@ export interface Quest {
   why_now: string;
   draft_message: string | null;
   status: QuestStatus;
+  plan_id: string | null;
   xp: number;
   due_at: string | null;
 }

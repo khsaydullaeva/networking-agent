@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { Redirect, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +15,7 @@ export default function Map() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!user) return;
       let cancelled = false;
       listConnections(user.id).then((conns) => {
         if (!cancelled) setConnections(conns);
@@ -22,12 +23,17 @@ export default function Map() {
       return () => {
         cancelled = true;
       };
-    }, [user.id])
+    }, [user])
   );
+
+  if (!user) return <Redirect href="/login" />;
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-row justify-between items-center px-6 pt-4">
+        <Pressable onPress={() => router.push("/dashboard")}>
+          <Text className="text-orange-600">Dashboard</Text>
+        </Pressable>
         <Text className="text-2xl font-bold text-gray-900">Your network</Text>
         <View className="items-end">
           <Text className="text-orange-600 font-bold text-lg">{user.xp} XP</Text>

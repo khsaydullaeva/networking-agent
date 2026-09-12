@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
@@ -14,13 +14,16 @@ export default function Connect() {
   const [scanning, setScanning] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualCode, setManualCode] = useState("");
+  const [manualLinkedin, setManualLinkedin] = useState("");
   const [permission, requestPermission] = useCameraPermissions();
 
   const [fallbackCode] = useState(generateFallbackCode());
-  const qrValue = encodeConnectPayload({ user_id: user.id, name: user.name, links: user.links });
+  const qrValue = user ? encodeConnectPayload({ user_id: user.id, name: user.name, links: user.links }) : "";
 
-  const proceedWith = (name: string, org: string) => {
-    setPendingConnect({ person: { name, org, links: {} } });
+  if (!user) return <Redirect href="/login" />;
+
+  const proceedWith = (name: string, org: string, linkedin?: string) => {
+    setPendingConnect({ person: { name, org, links: linkedin ? { linkedin } : {} } });
     router.push("/capture");
   };
 
@@ -28,13 +31,13 @@ export default function Connect() {
     setScanning(false);
     const payload = decodeConnectPayload(data);
     if (payload) {
-      proceedWith(payload.name, payload.org ?? "");
+      proceedWith(payload.name, payload.org ?? "", payload.links?.linkedin);
     }
   };
 
   const handleManualSubmit = () => {
     if (!manualName.trim() || manualCode.length !== 6) return;
-    proceedWith(manualName.trim(), "");
+    proceedWith(manualName.trim(), "", manualLinkedin.trim() || undefined);
   };
 
   if (scanning) {
@@ -81,7 +84,7 @@ export default function Connect() {
       </Pressable>
 
       <Text className="text-sm font-semibold text-gray-700 mb-2">
-        Or type their fallback code and name
+        Or type their fallback code and details
       </Text>
       <TextInput
         value={manualCode}
@@ -95,6 +98,14 @@ export default function Connect() {
         value={manualName}
         onChangeText={setManualName}
         placeholder="Their name"
+        className="border border-gray-300 rounded-xl px-4 py-3 mb-3 text-base"
+      />
+      <TextInput
+        value={manualLinkedin}
+        onChangeText={setManualLinkedin}
+        placeholder="Their LinkedIn URL (optional)"
+        autoCapitalize="none"
+        keyboardType="url"
         className="border border-gray-300 rounded-xl px-4 py-3 mb-4 text-base"
       />
       <Pressable

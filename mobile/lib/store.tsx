@@ -1,19 +1,27 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { createUser as apiCreateUser } from "@/lib/api";
-import type { Person, User } from "@/lib/types";
+import { addPlan as apiAddPlan, authSession as apiAuthSession } from "@/lib/api";
+import type { Person, Plan, User } from "@/lib/types";
 
-// Hardcoded dev user until Auth0 is wired in (README §7 — deliberately last).
-const DEV_USER: User = { id: "dev-user-1", name: "You", goals: [], links: {}, xp: 0, streak: 0 };
+const SESSION_KEY = "networking-agent.session";
+
+interface Session {
+  idToken: string | null; // null in USE_FIXTURES dev-login mode
+  user: User;
+}
 
 interface PendingConnect {
   person: Person;
 }
 
 interface StoreState {
-  user: User;
+  user: User | null;
+  authLoading: boolean;
+  login: (idToken: string) => Promise<User>;
+  logout: () => Promise<void>;
   setUser: (u: User) => void;
-  onboard: (name: string, goals: string[]) => Promise<void>;
+  addPlan: (title: string) => Promise<Plan>;
   pendingConnect: PendingConnect | null;
   setPendingConnect: (p: PendingConnect | null) => void;
 }
@@ -21,17 +29,77 @@ interface StoreState {
 const StoreContext = createContext<StoreState | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>(DEV_USER);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [pendingConnect, setPendingConnect] = useState<PendingConnect | null>(null);
 
-  const onboard = useCallback(async (name: string, goals: string[]) => {
-    const created = await apiCreateUser(name, goals);
-    setUser(created);
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await SecureStore.getItemAsync(SESSION_KEY);
+        if (raw) setSession(JSON.parse(raw));
+      } catch {
+        // corrupt or inaccessible store — fall through to logged-out state
+      } finally {
+        setAuthLoading(false);
+      }
+    })();
   }, []);
 
+  const persist = useCallback(async (next: Session | null) => {
+    if (next) await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
+    else await SecureStore.deleteItemAsync(SESSION_KEY);
+  }, []);
+
+  const login = useCallback(
+    async (idToken: string) => {
+      const user = await apiAuthSession(idToken);
+      const next: Session = { idToken, user };
+      setSession(next);
+      await persist(next);
+      return user;
+    },
+    [persist]
+  );
+
+  const logout = useCallback(async () => {
+    setSession(null);
+    await persist(null);
+  }, [persist]);
+
+  const setUser = useCallback(
+    (user: User) => {
+      setSession((prev) => {
+        const next: Session = prev ? { ...prev, user } : { idToken: null, user };
+        persist(next);
+        return next;
+      });
+    },
+    [persist]
+  );
+
+  const addPlan = useCallback(
+    async (title: string) => {
+      if (!session) throw new Error("not logged in");
+      const plan = await apiAddPlan(session.user.id, title);
+      setUser({ ...session.user, plans: [...session.user.plans, plan] });
+      return plan;
+    },
+    [session, setUser]
+  );
+
   const value = useMemo(
-    () => ({ user, setUser, onboard, pendingConnect, setPendingConnect }),
-    [user, onboard, pendingConnect]
+    () => ({
+      user: session?.user ?? null,
+      authLoading,
+      login,
+      logout,
+      setUser,
+      addPlan,
+      pendingConnect,
+      setPendingConnect,
+    }),
+    [session, authLoading, login, logout, setUser, addPlan, pendingConnect]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

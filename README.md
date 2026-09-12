@@ -153,7 +153,7 @@ Full JSON Schemas for what the agent must return live in `agent/README.md`.
 | `QUERIT_API_KEY` | agent | https://www.querit.ai/en/dashboard |
 | `LLM_PROVIDER` | agent | `k2` \| `gemini` \| `grok` — see `agent/README.md` |
 | `LLM_API_KEY` | agent | key for whichever provider is active |
-| `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` | mobile, backend | wire in last, see backend/README |
+| `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` | mobile, backend | LinkedIn login — enable LinkedIn as an Auth0 social connection, see backend/README §6 |
 | `ELEVENLABS_API_KEY` | backend or agent | optional, daily quest voice briefing |
 
 ---

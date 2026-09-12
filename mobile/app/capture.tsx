@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -58,7 +58,7 @@ export default function CaptureContext() {
   };
 
   const handleSubmit = async () => {
-    if (!pendingConnect) return;
+    if (!pendingConnect || !user) return;
     setSubmitting(true);
     try {
       const met: MetContext = {
@@ -82,6 +82,8 @@ export default function CaptureContext() {
       setSubmitting(false);
     }
   };
+
+  if (!user) return <Redirect href="/login" />;
 
   if (!pendingConnect) {
     return (

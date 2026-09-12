@@ -11,3 +11,15 @@ export const BACKEND_URL =
 // Flip off once backend/ is confirmed reachable; flip back on as the
 // wifi-outage demo safety net (coordinate with backend/README.md §5 DEMO_MODE).
 export const USE_FIXTURES = process.env.EXPO_PUBLIC_USE_FIXTURES !== "false";
+
+// Auth0 tenant used for login (LinkedIn as the social connection — see
+// backend/README.md §6). Same values as backend/.env's AUTH0_DOMAIN /
+// AUTH0_CLIENT_ID.
+export const AUTH0_DOMAIN =
+  process.env.EXPO_PUBLIC_AUTH0_DOMAIN ??
+  (Constants.expoConfig?.extra?.auth0Domain as string | undefined) ??
+  "";
+export const AUTH0_CLIENT_ID =
+  process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID ??
+  (Constants.expoConfig?.extra?.auth0ClientId as string | undefined) ??
+  "";
