@@ -1,8 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { QuestLogCard } from "@/components/QuestLogCard";
 import { addPlan, isStaleSessionError, linkQuestToPlan, listConnections, listQuests } from "@/lib/api";
 import { handleStaleSession } from "@/lib/session";
 import { useStore } from "@/lib/store";
@@ -53,7 +55,13 @@ export default function Dashboard() {
     }
   };
 
-  const pending = quests.filter((q) => q.status === "pending");
+  const pending = [...quests.filter((q) => q.status === "pending")].sort((a, b) => {
+    if (!a.due_at && !b.due_at) return 0;
+    if (!a.due_at) return 1;
+    if (!b.due_at) return -1;
+    return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+  });
+  const totalXpAvailable = pending.reduce((sum, q) => sum + q.xp, 0);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -84,62 +92,44 @@ export default function Dashboard() {
           </Pressable>
         </View>
 
-        <Text className="text-lg font-bold text-gray-900 mb-3">Follow-up tasks</Text>
-        {pending.length === 0 && <Text className="text-gray-400">Nothing pending — go connect with someone.</Text>}
-        {pending.map((q) => {
-          const linkedPlan = user.plans.find((p) => p.id === q.plan_id);
-          const isLinking = linkingQuestId === q.id;
-          return (
-            <Pressable
-              key={q.id}
-              onPress={() => router.push(`/connection/${q.connection_id}`)}
-              className="border border-gray-200 rounded-2xl p-4 mb-3"
-            >
-              <Text className="text-xs text-gray-400 mb-1">{personNameFor(q.connection_id)}</Text>
-              <Text className="text-base font-semibold text-gray-900 mb-2">{q.title}</Text>
+        <View className="flex-row items-center justify-between mb-1">
+          <View className="flex-row items-center">
+            <Ionicons name="map" size={18} color="#111827" />
+            <Text className="text-lg font-bold text-gray-900 ml-2">Quest Log</Text>
+            {pending.length > 0 && (
+              <View className="bg-gray-900 rounded-full w-5 h-5 items-center justify-center ml-2">
+                <Text className="text-white text-[11px] font-bold">{pending.length}</Text>
+              </View>
+            )}
+          </View>
+          {totalXpAvailable > 0 && (
+            <View className="flex-row items-center bg-amber-50 rounded-full px-2 py-1">
+              <Ionicons name="star" size={12} color="#d97706" />
+              <Text className="text-amber-700 text-xs font-bold ml-1">{totalXpAvailable} XP available</Text>
+            </View>
+          )}
+        </View>
+        <Text className="text-xs text-gray-400 mb-3">Complete quests to earn XP and grow your streak.</Text>
 
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setLinkingQuestId(isLinking ? null : q.id);
-                }}
-                className="self-start px-3 py-1 rounded-full bg-gray-100"
-              >
-                <Text className="text-xs text-gray-600">
-                  {linkedPlan ? `Linked: ${linkedPlan.title}` : "Link to a plan"}
-                </Text>
-              </Pressable>
+        {pending.length === 0 && (
+          <View className="items-center py-10 mb-4 bg-gray-50 rounded-2xl">
+            <Ionicons name="checkmark-done-circle" size={32} color="#9ca3af" />
+            <Text className="text-gray-400 mt-2">Quest log clear — go connect with someone.</Text>
+          </View>
+        )}
 
-              {isLinking && (
-                <View className="flex-row flex-wrap gap-2 mt-3">
-                  {user.plans.map((p) => (
-                    <Pressable
-                      key={p.id}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleLink(q.id, p.id);
-                      }}
-                      className={`px-3 py-1 rounded-full ${p.id === q.plan_id ? "bg-orange-500" : "bg-gray-200"}`}
-                    >
-                      <Text className={`text-xs ${p.id === q.plan_id ? "text-white" : "text-gray-700"}`}>{p.title}</Text>
-                    </Pressable>
-                  ))}
-                  {q.plan_id && (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleLink(q.id, null);
-                      }}
-                      className="px-3 py-1 rounded-full bg-gray-200"
-                    >
-                      <Text className="text-xs text-gray-700">Unlink</Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
+        {pending.map((q) => (
+          <QuestLogCard
+            key={q.id}
+            quest={q}
+            personName={personNameFor(q.connection_id)}
+            plans={user.plans}
+            isLinking={linkingQuestId === q.id}
+            onPress={() => router.push(`/connection/${q.connection_id}`)}
+            onToggleLinking={() => setLinkingQuestId(linkingQuestId === q.id ? null : q.id)}
+            onLinkPlan={(planId) => handleLink(q.id, planId)}
+          />
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

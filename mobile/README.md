@@ -77,10 +77,15 @@ classic multi-hour time sink.
    celebration popup (see §4a) → navigate back to the map.
 7. **Network map** (tab: "Map" — the demo centerpiece — give this the
    most polish time) — see §4.
-8. **Dashboard** (tab: "Dashboard") — your plans, and the feed of every
-   pending follow-up task across all connections (`GET /quests?owner_id=`).
-   Tapping a task lets you link it to a plan (`POST /quests/:id/link-plan`)
-   — this is the "connect follow-up tasks to your improvement plans" loop.
+8. **Dashboard** (tab: "Dashboard") — your plans, and the "Quest Log":
+   every pending follow-up task across all connections
+   (`GET /quests?owner_id=`), styled like an RPG quest log
+   (`components/QuestLogCard.tsx`) — per-type icon/color, an XP reward
+   chip, and a due-date urgency badge (red "Overdue"/"Due today" down to
+   gray "Due in Nd"), sorted soonest-due first. Tapping a task's "Attach
+   to a quest line" lets you link it to a plan
+   (`POST /quests/:id/link-plan`) — this is the "connect follow-up tasks
+   to your improvement plans" loop.
 9. **Profile** (tab: "Profile") — your own profile links (LinkedIn,
    Instagram, Facebook — entered manually, `POST /users/:id/links`; this
    is what gets shared via your QR code and what the agent searches for
@@ -248,3 +253,6 @@ testing plans/dashboard/connect without a live Auth0 tenant at all.
       quest, showing the correct XP and streak each time
 - [ ] A note with a concrete plan (e.g. "meet 2pm Monday") produces a
       specific quest even when the contact has no enrichment facts at all
+- [ ] Dashboard's Quest Log shows the correct icon/color per quest type,
+      the right XP chip, and a due-date badge that goes red as it gets
+      close to (or past) due, sorted soonest-first
