@@ -1,7 +1,6 @@
-import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import React from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AUTH0_DOMAIN, USE_FIXTURES } from "@/lib/config";
@@ -11,7 +10,7 @@ import { useStore } from "@/lib/store";
 export default function Login() {
   const router = useRouter();
   const { login } = useStore();
-  const { login: promptAuth0Login, loading, error, ready, redirectUri } = useAuth0Login();
+  const { login: promptAuth0Login, loading, error, ready } = useAuth0Login();
   const [signingIn, setSigningIn] = React.useState(false);
 
   const afterLogin = (plansCount: number) => {
@@ -70,30 +69,6 @@ export default function Login() {
         <Pressable disabled={busy} onPress={handleDevLogin} className="w-full bg-gray-800 rounded-xl py-4 items-center">
           <Text className="text-white font-semibold text-base">Continue as dev user (fixtures)</Text>
         </Pressable>
-      )}
-
-      <View className="mt-8">
-        <Text className="text-xs text-gray-400 text-center">
-          Logging in lets you connect with people and tracks your follow-up tasks.
-        </Text>
-      </View>
-
-      {!USE_FIXTURES && !!redirectUri && (
-        <View className="mt-8 w-full">
-          <Text className="text-xs text-gray-400 text-center mb-1">
-            If login fails with "Callback URL mismatch", add this exact URL to Auth0 → Applications →
-            your app → Allowed Callback URLs, then try again:
-          </Text>
-          <Pressable
-            onPress={() => Clipboard.setStringAsync(redirectUri)}
-            className="bg-gray-100 rounded-lg px-3 py-2"
-          >
-            <Text className="text-xs text-gray-700 text-center" selectable>
-              {redirectUri}
-            </Text>
-            <Text className="text-[10px] text-gray-400 text-center mt-1">Tap to copy</Text>
-          </Pressable>
-        </View>
       )}
     </SafeAreaView>
   );
