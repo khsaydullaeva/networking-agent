@@ -1,0 +1,148 @@
+"""API tests run against DEMO_MODE (zero network calls to Querit/LLM) and
+the in-memory db fallback (no Atlas needed).
+
+Run with: DEMO_MODE=true python -m pytest backend/tests/test_api.py -v
+"""
+
+import os
+
+os.environ["DEMO_MODE"] = "true"
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.app import db as db_module
+from backend.app.main import app
+
+
+@pytest.fixture(autouse=True)
+def fresh_db():
+    db_module._db = None
+    yield
+    db_module._db = None
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+def test_create_user(client):
+    resp = client.post("/users", json={"name": "Alice", "goals": ["ML internship"], "links": {}})
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["name"] == "Alice"
+    assert body["xp"] == 0
+    assert "id" in body
+
+
+def test_create_connection_returns_immediately_with_demo_enrichment(client):
+    user = client.post("/users", json={"name": "Bob", "goals": [], "links": {}}).json()
+
+    resp = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "Ava Chen", "org": "CMU", "links": {}},
+            "met": {"lat": 0.0, "lng": 0.0, "context_type": "conference"},
+            "notes": ["met at career fair"],
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["enrichment"] is not None  # DEMO_MODE fills this in synchronously
+    assert "warmth" in body
+
+
+def test_get_connection_includes_quests(client):
+    user = client.post("/users", json={"name": "Cara", "goals": [], "links": {}}).json()
+    conn = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "Marcus Reyes", "org": "Querit", "links": {}},
+            "met": {"context_type": "work"},
+            "notes": [],
+        },
+    ).json()
+
+    resp = client.get(f"/connections/{conn['id']}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["enrichment"] is not None
+    assert len(body["quests"]) >= 1
+
+
+def test_list_connections_by_owner(client):
+    user = client.post("/users", json={"name": "Dee", "goals": [], "links": {}}).json()
+    client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "P1", "org": "", "links": {}},
+            "met": {"context_type": "campus"},
+            "notes": [],
+        },
+    )
+    client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "P2", "org": "", "links": {}},
+            "met": {"context_type": "club"},
+            "notes": [],
+        },
+    )
+
+    resp = client.get(f"/connections?owner_id={user['id']}")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+def test_complete_quest_awards_xp(client):
+    user = client.post("/users", json={"name": "Eve", "goals": [], "links": {}}).json()
+    conn = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "P3", "org": "", "links": {}},
+            "met": {"context_type": "conference"},
+            "notes": [],
+        },
+    ).json()
+    quest_id = conn["quests"][0]["id"] if "quests" in conn else client.get(f"/connections/{conn['id']}").json()["quests"][0]["id"]
+
+    resp = client.post(f"/quests/{quest_id}/complete")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["quest"]["status"] == "completed"
+    assert body["xp_awarded"] > 0
+    assert body["new_total_xp"] == body["xp_awarded"]
+
+    # completing twice should fail cleanly
+    resp2 = client.post(f"/quests/{quest_id}/complete")
+    assert resp2.status_code == 400
+
+
+def test_warmth_differs_by_context_type(client):
+    user = client.post("/users", json={"name": "Fay", "goals": [], "links": {}}).json()
+    work_conn = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "W", "org": "", "links": {}},
+            "met": {"context_type": "work"},
+            "notes": [],
+        },
+    ).json()
+    conf_conn = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "C", "org": "", "links": {}},
+            "met": {"context_type": "conference"},
+            "notes": [],
+        },
+    ).json()
+
+    assert work_conn["warmth"] > conf_conn["warmth"]
