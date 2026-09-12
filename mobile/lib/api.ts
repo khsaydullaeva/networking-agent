@@ -7,13 +7,30 @@ import type { Connection, Links, Plan, Quest, User } from "@/lib/types";
 // USE_FIXTURES lets every screen work before backend/ is reachable, and
 // doubles as the wifi-outage demo safety net.
 
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// The backend runs on an in-memory store until Postgres is wired up
+// (root README.md §4 DATABASE_URL), so a backend restart wipes all users —
+// a session persisted on the phone can then point at a user_id that no
+// longer exists. Callers that mutate "the current user" should catch
+// ApiError with status 401/404 and prompt a re-login rather than crash.
+export function isStaleSessionError(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 404 || e.status === 401);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(`${BACKEND_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
   if (!resp.ok) {
-    throw new Error(`${init?.method ?? "GET"} ${path} failed: ${resp.status}`);
+    throw new ApiError(resp.status, `${init?.method ?? "GET"} ${path} failed: ${resp.status}`);
   }
   return resp.json();
 }

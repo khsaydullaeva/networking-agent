@@ -1,15 +1,15 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { addPlan, linkQuestToPlan, listConnections, listQuests, updateLinks } from "@/lib/api";
+import { addPlan, isStaleSessionError, linkQuestToPlan, listConnections, listQuests, updateLinks } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import type { Connection, Quest } from "@/lib/types";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, setUser } = useStore();
+  const { user, setUser, logout } = useStore();
   const [quests, setQuests] = useState<Quest[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [newPlanTitle, setNewPlanTitle] = useState("");
@@ -38,18 +38,38 @@ export default function Dashboard() {
   const personNameFor = (connectionId: string) =>
     connections.find((c) => c.id === connectionId)?.person.name ?? "Someone";
 
+  // The backend runs on an in-memory store until Postgres is wired up, so
+  // a backend restart wipes all users -- a session saved on this phone can
+  // then point at a user_id that no longer exists there. Rather than crash
+  // on the failed request, prompt a clean re-login.
+  const handleStaleSession = async () => {
+    await logout();
+    Alert.alert("Signed out", "Your session expired — please log in again.");
+    router.replace("/login");
+  };
+
   const handleAddPlan = async () => {
     const title = newPlanTitle.trim();
     if (!title) return;
-    const plan = await addPlan(user.id, title);
-    setUser({ ...user, plans: [...user.plans, plan] });
-    setNewPlanTitle("");
+    try {
+      const plan = await addPlan(user.id, title);
+      setUser({ ...user, plans: [...user.plans, plan] });
+      setNewPlanTitle("");
+    } catch (e) {
+      if (isStaleSessionError(e)) await handleStaleSession();
+      else Alert.alert("Couldn't add plan", "Please try again.");
+    }
   };
 
   const handleLink = async (questId: string, planId: string | null) => {
-    const updated = await linkQuestToPlan(questId, planId);
-    setQuests((prev) => prev.map((q) => (q.id === questId ? updated : q)));
-    setLinkingQuestId(null);
+    try {
+      const updated = await linkQuestToPlan(questId, planId);
+      setQuests((prev) => prev.map((q) => (q.id === questId ? updated : q)));
+      setLinkingQuestId(null);
+    } catch (e) {
+      if (isStaleSessionError(e)) await handleStaleSession();
+      else Alert.alert("Couldn't link task", "Please try again.");
+    }
   };
 
   const handleSaveLinks = async () => {
@@ -61,6 +81,9 @@ export default function Dashboard() {
         facebook: facebook.trim() || undefined,
       });
       setUser(updatedUser);
+    } catch (e) {
+      if (isStaleSessionError(e)) await handleStaleSession();
+      else Alert.alert("Couldn't save links", "Please try again.");
     } finally {
       setSavingLinks(false);
     }
