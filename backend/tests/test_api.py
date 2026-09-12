@@ -124,6 +124,52 @@ def test_complete_quest_awards_xp(client):
     assert resp2.status_code == 400
 
 
+@pytest.mark.anyio
+async def test_run_enrichment_translates_agent_facts_to_shared_shape(monkeypatch):
+    """agent/ returns enrichment as {"facts": [...]} (agent/README.md §3),
+    but the shared Enrichment model (root README.md §3) is
+    {role, interests, recent_activity, links}. Regression test for a bug
+    where the real (non-demo) path stored the raw agent shape directly,
+    so mobile's `enrichment.interests.length` crashed on undefined."""
+    from backend.app import main as main_module
+
+    db_module._db = None
+    db = db_module.get_db()
+    user = await db.users.insert_one({"name": "U", "goals": [], "xp": 0})
+    conn = await db.connections.insert_one(
+        {
+            "owner_id": user["_id"],
+            "person": {"name": "P", "org": "", "links": {}},
+            "met": {"context_type": "conference"},
+            "notes": [],
+            "enrichment": None,
+            "last_touch": None,
+        }
+    )
+
+    async def fake_enrich(**kwargs):
+        return {
+            "enrichment": {"facts": [{"fact": "did a thing", "source_url": "https://x.com", "date": None}]},
+            "quests": [],
+        }
+
+    monkeypatch.setattr(main_module, "enrich_and_generate_quests", fake_enrich)
+
+    await main_module._run_enrichment(conn["_id"])
+
+    stored = await db.connections.find_one({"_id": conn["_id"]})
+    assert stored["enrichment"]["recent_activity"] == [
+        {"fact": "did a thing", "source_url": "https://x.com", "date": None}
+    ]
+    assert stored["enrichment"]["interests"] == []
+    assert stored["enrichment"]["role"] is None
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
 def test_warmth_differs_by_context_type(client):
     user = client.post("/users", json={"name": "Fay", "goals": [], "links": {}}).json()
     work_conn = client.post(

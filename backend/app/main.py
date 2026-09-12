@@ -50,7 +50,16 @@ async def _run_enrichment(connection_id: str):
         notes=connection["notes"],
         user_goals=user_goals,
     )
-    enrichment = result["enrichment"]
+    # agent/ returns enrichment as {"facts": [...]} (see agent/README.md §3);
+    # the shared data model's Enrichment shape (root README.md §3) is
+    # {role, interests, recent_activity, links} — translate here so this is
+    # the only place that needs to know about the agent's raw output shape.
+    enrichment = {
+        "role": None,
+        "interests": [],
+        "recent_activity": result["enrichment"]["facts"],
+        "links": {},
+    }
     await db.connections.update_one({"_id": connection_id}, {"$set": {"enrichment": enrichment}})
 
     for q in result["quests"]:
