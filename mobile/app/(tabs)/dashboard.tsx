@@ -1,9 +1,10 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { addPlan, isStaleSessionError, linkQuestToPlan, listConnections, listQuests, updateLinks } from "@/lib/api";
+import { addPlan, isStaleSessionError, linkQuestToPlan, listConnections, listQuests } from "@/lib/api";
+import { handleStaleSession } from "@/lib/session";
 import { useStore } from "@/lib/store";
 import type { Connection, Quest } from "@/lib/types";
 
@@ -14,16 +15,6 @@ export default function Dashboard() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [newPlanTitle, setNewPlanTitle] = useState("");
   const [linkingQuestId, setLinkingQuestId] = useState<string | null>(null);
-  const [linkedin, setLinkedin] = useState(user?.links.linkedin ?? "");
-  const [instagram, setInstagram] = useState(user?.links.instagram ?? "");
-  const [facebook, setFacebook] = useState(user?.links.facebook ?? "");
-  const [savingLinks, setSavingLinks] = useState(false);
-
-  useEffect(() => {
-    setLinkedin(user?.links.linkedin ?? "");
-    setInstagram(user?.links.instagram ?? "");
-    setFacebook(user?.links.facebook ?? "");
-  }, [user?.links.linkedin, user?.links.instagram, user?.links.facebook]);
 
   const refresh = useCallback(() => {
     if (!user) return;
@@ -38,16 +29,6 @@ export default function Dashboard() {
   const personNameFor = (connectionId: string) =>
     connections.find((c) => c.id === connectionId)?.person.name ?? "Someone";
 
-  // The backend runs on an in-memory store until Postgres is wired up, so
-  // a backend restart wipes all users -- a session saved on this phone can
-  // then point at a user_id that no longer exists there. Rather than crash
-  // on the failed request, prompt a clean re-login.
-  const handleStaleSession = async () => {
-    await logout();
-    Alert.alert("Signed out", "Your session expired — please log in again.");
-    router.replace("/login");
-  };
-
   const handleAddPlan = async () => {
     const title = newPlanTitle.trim();
     if (!title) return;
@@ -56,7 +37,7 @@ export default function Dashboard() {
       setUser({ ...user, plans: [...user.plans, plan] });
       setNewPlanTitle("");
     } catch (e) {
-      if (isStaleSessionError(e)) await handleStaleSession();
+      if (isStaleSessionError(e)) await handleStaleSession(logout);
       else Alert.alert("Couldn't add plan", "Please try again.");
     }
   };
@@ -67,25 +48,8 @@ export default function Dashboard() {
       setQuests((prev) => prev.map((q) => (q.id === questId ? updated : q)));
       setLinkingQuestId(null);
     } catch (e) {
-      if (isStaleSessionError(e)) await handleStaleSession();
+      if (isStaleSessionError(e)) await handleStaleSession(logout);
       else Alert.alert("Couldn't link task", "Please try again.");
-    }
-  };
-
-  const handleSaveLinks = async () => {
-    setSavingLinks(true);
-    try {
-      const updatedUser = await updateLinks(user.id, {
-        linkedin: linkedin.trim() || undefined,
-        instagram: instagram.trim() || undefined,
-        facebook: facebook.trim() || undefined,
-      });
-      setUser(updatedUser);
-    } catch (e) {
-      if (isStaleSessionError(e)) await handleStaleSession();
-      else Alert.alert("Couldn't save links", "Please try again.");
-    } finally {
-      setSavingLinks(false);
     }
   };
 
@@ -93,50 +57,11 @@ export default function Dashboard() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row justify-between items-center px-6 pt-4">
+      <View className="px-6 pt-4">
         <Text className="text-2xl font-bold text-gray-900">Dashboard</Text>
-        <Pressable onPress={() => router.push("/map")}>
-          <Text className="text-orange-600">Map</Text>
-        </Pressable>
       </View>
 
       <ScrollView className="px-6 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text className="text-lg font-bold text-gray-900 mb-3">Your links</Text>
-        <Text className="text-xs text-gray-500 mb-2">
-          Shown to people you connect with, and shared via your QR code.
-        </Text>
-        <TextInput
-          value={linkedin}
-          onChangeText={setLinkedin}
-          placeholder="Your LinkedIn URL"
-          autoCapitalize="none"
-          keyboardType="url"
-          className="border border-gray-300 rounded-xl px-4 py-2 mb-2 text-sm"
-        />
-        <TextInput
-          value={instagram}
-          onChangeText={setInstagram}
-          placeholder="Your Instagram URL"
-          autoCapitalize="none"
-          keyboardType="url"
-          className="border border-gray-300 rounded-xl px-4 py-2 mb-2 text-sm"
-        />
-        <TextInput
-          value={facebook}
-          onChangeText={setFacebook}
-          placeholder="Your Facebook URL"
-          autoCapitalize="none"
-          keyboardType="url"
-          className="border border-gray-300 rounded-xl px-4 py-2 mb-3 text-sm"
-        />
-        <Pressable
-          disabled={savingLinks}
-          onPress={handleSaveLinks}
-          className="self-start px-4 py-2 rounded-xl bg-gray-800 mb-8"
-        >
-          <Text className="text-white text-sm font-medium">{savingLinks ? "Saving..." : "Save links"}</Text>
-        </Pressable>
-
         <Text className="text-lg font-bold text-gray-900 mb-3">Your plans</Text>
         {user.plans.length === 0 && <Text className="text-gray-400 mb-3">No plans yet.</Text>}
         <View className="flex-row flex-wrap gap-2 mb-3">

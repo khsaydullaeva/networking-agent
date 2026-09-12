@@ -24,6 +24,7 @@ another teammate's server being up.
 - `expo-auth-session` + `expo-web-browser` — Auth0 Universal Login,
   standard sign up / sign in (see §7 — wired in for real, not a stub)
 - `expo-secure-store` — persists the logged-in session across app restarts
+- `@expo/vector-icons` — bottom tab bar icons (see §3)
 - State: React Context + `useReducer`, or Zustand if the team prefers —
   don't reach for Redux, there isn't time
 - Run via **Expo Go** on real phones. No EAS build, no TestFlight.
@@ -49,13 +50,14 @@ classic multi-hour time sink.
 2. **Plans setup** — shown once, right after a login that has zero plans.
    Add 1+ "improvement plans" (root README.md §3) — chips for common ones
    plus free text. Blocks continuing until at least one plan exists.
-3. **Connect** — big QR code (encodes your `user_id`, `name`, and `links`
-   — including whatever social links you've added on the dashboard) + a
-   "Scan" button that opens the camera. Below the QR, show the 6-digit
-   fallback code and inputs to type the other person's code and name
-   (camera-under-stage-lights fallback — do not skip this). No manual
-   link entry here — scanning their QR is the only way their profile
-   links come through; the manual fallback trades that off for speed.
+3. **Connect** (tab: "Scan QR") — big QR code (encodes your `user_id`,
+   `name`, and `links` — including whatever social links you've added on
+   your profile) + a "Scan" button that opens the camera. Below the QR,
+   show the 6-digit fallback code and inputs to type the other person's
+   code and name (camera-under-stage-lights fallback — do not skip this).
+   No manual link entry here — scanning their QR is the only way their
+   profile links come through; the manual fallback trades that off for
+   speed.
 4. **Capture context** — appears immediately after a successful connect.
    Auto-fills GPS → place label (reverse geocode or just show raw
    coords + let user label it "Career Fair") and timestamp. One text
@@ -73,18 +75,20 @@ classic multi-hour time sink.
    - `share`: shows what to share, a "Mark done" button
    Completing any quest → call `POST /quests/:id/complete` → play the XP
    animation (see §4) → navigate back to the map.
-7. **Network map** (the demo centerpiece — give this the most polish time)
-   — see §4.
-8. **Dashboard** — three things: (a) your own profile links (LinkedIn,
-   Instagram, Facebook — entered manually, `POST /users/:id/links`; this
-   is what gets shared via your QR code and what the agent searches for
-   contacts you add later), (b) your plans, (c) the feed of every pending
-   follow-up task across all connections (`GET /quests?owner_id=`).
+7. **Network map** (tab: "Map" — the demo centerpiece — give this the
+   most polish time) — see §4.
+8. **Dashboard** (tab: "Dashboard") — your plans, and the feed of every
+   pending follow-up task across all connections (`GET /quests?owner_id=`).
    Tapping a task lets you link it to a plan (`POST /quests/:id/link-plan`)
    — this is the "connect follow-up tasks to your improvement plans" loop.
+9. **Profile** (tab: "Profile") — your own profile links (LinkedIn,
+   Instagram, Facebook — entered manually, `POST /users/:id/links`; this
+   is what gets shared via your QR code and what the agent searches for
+   contacts you add later), plus XP/streak and log out.
 
-Do not build more screens than this for MVP. A settings screen, a search
-screen, a contacts list screen are all cuttable.
+Screens 7-9 live behind a bottom tab bar (see §3). Do not build more
+screens than this for MVP. A settings screen, a search screen, a
+contacts list screen are all cuttable.
 
 ---
 
@@ -95,10 +99,19 @@ Login ──(first login, no plans)──► Plans setup ──┐
   │                                                │
   └──(already has plans / returning session)───────┤
                                                      ▼
-                          Connect ──(scan success)──► Capture context ──► Connection detail ──► Network map ──► Dashboard
-                             ▲                                                                       │  ▲              │
-                             └───────────────────────── "Connect another" ◄───────────────────────────┘  └── "Map" ◄────┘
+                          ┌──────────────────────────────────────────────────┐
+                          │                (tabs) bottom tab bar              │
+                          │   Dashboard   Profile   Scan QR   Map             │
+                          └──────────────────────────────────────────────────┘
+                                                     │
+                        Scan QR tab ──(scan/manual success)──► Capture context ──► Connection detail
 ```
+
+The tab bar (`app/(tabs)/_layout.tsx`, an `expo-router` `<Tabs>` layout)
+is the app's home once logged in — Dashboard, Profile, Connect ("Scan
+QR"), and Map are siblings there, in that order. Login, Plans setup,
+Capture context, and Connection detail are full-screen flow steps outside
+the tab bar (pushed on top of it, same as any stack screen).
 
 ---
 
@@ -164,13 +177,16 @@ Callback URLs** the first time you run it on a new dev machine/network
 "Callback URL mismatch" error).
 
 Profile links (LinkedIn, Instagram, Facebook) are **not** tied to login —
-they're entered manually after signing in, on the dashboard's "Your
-links" section (`POST /users/:id/links`), same pattern as capturing a
-*contact's* links on the connect screen.
+they're entered manually after signing in, on the Profile tab
+(`POST /users/:id/links`), same pattern as capturing a *contact's* links
+on the connect screen.
 
-Every screen behind login (`/plans-setup`, `/map`, `/connect`, `/capture`,
-`/connection/:id`, `/dashboard`) redirects to `/login` if `useStore().user`
-is null — see each screen's top-level `if (!user) return <Redirect .../>`.
+Every screen behind login (`/plans-setup`, `/capture`, `/connection/:id`,
+and every screen in `(tabs)`: `/map`, `/connect`, `/dashboard`, `/profile`)
+redirects to `/login` if `useStore().user` is null — see each screen's
+top-level `if (!user) return <Redirect .../>` (Dashboard/Profile just
+`return null` since they're reachable only from inside the tab bar, which
+only renders once logged in).
 
 Set `EXPO_PUBLIC_USE_FIXTURES=true` to bypass real login entirely via the
 "Continue as dev user (fixtures)" button on the login screen — useful for
@@ -199,6 +215,8 @@ testing plans/dashboard/connect without a live Auth0 tenant at all.
       tappable links on Connection detail
 - [ ] Dashboard lists every pending task across all connections, and
       linking one to a plan persists (reload and it's still linked)
-- [ ] Saving your own links on the dashboard persists (reload and
+- [ ] Saving your own links on the Profile tab persists (reload and
       they're still there) and shows up in your QR code for the next
       person you connect with
+- [ ] All four tabs (Dashboard, Profile, Scan QR, Map) are reachable from
+      the bottom tab bar at all times once logged in

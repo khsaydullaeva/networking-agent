@@ -31,9 +31,6 @@ export default function Map() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-row justify-between items-center px-6 pt-4">
-        <Pressable onPress={() => router.push("/dashboard")}>
-          <Text className="text-orange-600">Dashboard</Text>
-        </Pressable>
         <Text className="text-2xl font-bold text-gray-900">Your network</Text>
         <View className="items-end">
           <Text className="text-orange-600 font-bold text-lg">{user.xp} XP</Text>
