@@ -27,18 +27,24 @@ async def enrich(person: dict, met_context: dict) -> dict:
         fallback={"queries": []},
     )
 
-    query_list = queries["queries"]
-    if not query_list:
+    # Any profile links the user typed in manually (LinkedIn, Instagram,
+    # Facebook, ...) are searched directly too, so enrichment can ground
+    # facts in the specific profile provided rather than only guessing
+    # from name + org. These flow through the same verification below as
+    # ordinary queries — a provided link is a lead, not a trusted source.
+    link_queries = [url for url in person.get("links", {}).values() if url]
+    all_queries = queries["queries"] + link_queries
+    if not all_queries:
         return {"facts": []}
 
     results = await asyncio.gather(
-        *[querit_search(q) for q in query_list], return_exceptions=True
+        *[querit_search(q) for q in all_queries], return_exceptions=True
     )
     # A failed search for one query shouldn't sink the others.
     clean_results = [r if isinstance(r, list) else [] for r in results]
 
     facts: list[dict] = []
-    for query, result_set in zip(query_list, clean_results):
+    for query, result_set in zip(all_queries, clean_results):
         if not result_set:
             continue
         extracted = await with_one_retry(

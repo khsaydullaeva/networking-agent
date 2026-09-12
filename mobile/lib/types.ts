@@ -5,6 +5,8 @@ export type PlanStatus = "active" | "done";
 
 export interface Links {
   linkedin?: string;
+  instagram?: string;
+  facebook?: string;
   github?: string;
   twitter?: string;
   [key: string]: string | undefined;

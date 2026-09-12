@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { decodeConnectPayload, encodeConnectPayload, generateFallbackCode } from "@/lib/connectCode";
 import { useStore } from "@/lib/store";
+import type { Links } from "@/lib/types";
 
 export default function Connect() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function Connect() {
   const [manualName, setManualName] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [manualLinkedin, setManualLinkedin] = useState("");
+  const [manualInstagram, setManualInstagram] = useState("");
+  const [manualFacebook, setManualFacebook] = useState("");
   const [permission, requestPermission] = useCameraPermissions();
 
   const [fallbackCode] = useState(generateFallbackCode());
@@ -22,8 +25,8 @@ export default function Connect() {
 
   if (!user) return <Redirect href="/login" />;
 
-  const proceedWith = (name: string, org: string, linkedin?: string) => {
-    setPendingConnect({ person: { name, org, links: linkedin ? { linkedin } : {} } });
+  const proceedWith = (name: string, org: string, links: Links) => {
+    setPendingConnect({ person: { name, org, links } });
     router.push("/capture");
   };
 
@@ -31,13 +34,17 @@ export default function Connect() {
     setScanning(false);
     const payload = decodeConnectPayload(data);
     if (payload) {
-      proceedWith(payload.name, payload.org ?? "", payload.links?.linkedin);
+      proceedWith(payload.name, payload.org ?? "", payload.links ?? {});
     }
   };
 
   const handleManualSubmit = () => {
     if (!manualName.trim() || manualCode.length !== 6) return;
-    proceedWith(manualName.trim(), "", manualLinkedin.trim() || undefined);
+    const links: Links = {};
+    if (manualLinkedin.trim()) links.linkedin = manualLinkedin.trim();
+    if (manualInstagram.trim()) links.instagram = manualInstagram.trim();
+    if (manualFacebook.trim()) links.facebook = manualFacebook.trim();
+    proceedWith(manualName.trim(), "", links);
   };
 
   if (scanning) {
@@ -100,10 +107,30 @@ export default function Connect() {
         placeholder="Their name"
         className="border border-gray-300 rounded-xl px-4 py-3 mb-3 text-base"
       />
+
+      <Text className="text-xs text-gray-500 mb-2">
+        Their profile links (optional) — the agent searches these directly for insights.
+      </Text>
       <TextInput
         value={manualLinkedin}
         onChangeText={setManualLinkedin}
-        placeholder="Their LinkedIn URL (optional)"
+        placeholder="LinkedIn URL"
+        autoCapitalize="none"
+        keyboardType="url"
+        className="border border-gray-300 rounded-xl px-4 py-3 mb-2 text-base"
+      />
+      <TextInput
+        value={manualInstagram}
+        onChangeText={setManualInstagram}
+        placeholder="Instagram URL"
+        autoCapitalize="none"
+        keyboardType="url"
+        className="border border-gray-300 rounded-xl px-4 py-3 mb-2 text-base"
+      />
+      <TextInput
+        value={manualFacebook}
+        onChangeText={setManualFacebook}
+        placeholder="Facebook URL"
         autoCapitalize="none"
         keyboardType="url"
         className="border border-gray-300 rounded-xl px-4 py-3 mb-4 text-base"

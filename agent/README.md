@@ -169,12 +169,18 @@ async def enrich(person: dict, met_context: dict) -> dict:
         schema=QUERY_PLAN_SCHEMA,   # {"queries": ["string", "string", "string"]}
     )
 
+    # 1b. Any profile links the user typed in manually on the connect
+    # screen (LinkedIn, Instagram, Facebook, ...) are searched directly
+    # too — a provided link is a lead, not a trusted source, so it still
+    # goes through the same verification in step 4.
+    all_queries = queries["queries"] + [u for u in person.get("links", {}).values() if u]
+
     # 2. Querit search, in parallel
-    results = await asyncio.gather(*[querit_search(q) for q in queries["queries"]])
+    results = await asyncio.gather(*[querit_search(q) for q in all_queries])
 
     # 3. Extract facts per result, LLM call per result (or batch if provider allows)
     facts = []
-    for query, result_set in zip(queries["queries"], results):
+    for query, result_set in zip(all_queries, results):
         extracted = await llm.generate_json(
             system_prompt=EXTRACT_FACTS_PROMPT,
             user_prompt=json.dumps({"query": query, "results": result_set}),

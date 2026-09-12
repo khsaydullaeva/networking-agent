@@ -8,6 +8,14 @@ import { completeQuest, getConnection } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import type { Connection } from "@/lib/types";
 
+const LINK_LABELS: Record<string, string> = {
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  github: "GitHub",
+  twitter: "Twitter",
+};
+
 export default function ConnectionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -63,12 +71,16 @@ export default function ConnectionDetail() {
 
         <Text className="text-2xl font-bold text-gray-900">{person?.name || "Unknown"}</Text>
         {!!person?.org && <Text className="text-base text-gray-500">{person.org}</Text>}
-        {!!person?.links?.linkedin && (
-          <Pressable onPress={() => Linking.openURL(person.links.linkedin as string)}>
-            <Text className="text-sm text-[#0A66C2] mb-4">View LinkedIn profile</Text>
-          </Pressable>
-        )}
-        {!person?.links?.linkedin && <View className="mb-4" />}
+
+        <View className="flex-row flex-wrap gap-3 mb-4 mt-1">
+          {Object.entries(person?.links ?? {})
+            .filter(([, url]) => !!url)
+            .map(([platform, url]) => (
+              <Pressable key={platform} onPress={() => Linking.openURL(url as string)}>
+                <Text className="text-sm text-blue-600">{LINK_LABELS[platform] ?? platform}</Text>
+              </Pressable>
+            ))}
+        </View>
 
         {!enrichment ? (
           <View className="flex-row items-center gap-2 mb-6">
