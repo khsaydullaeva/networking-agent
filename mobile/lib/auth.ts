@@ -42,15 +42,30 @@ export function useAuth0Login() {
         }
         return null;
       }
-      const tokenResponse = await AuthSession.exchangeCodeAsync(
-        {
-          clientId: AUTH0_CLIENT_ID,
-          code: result.params.code,
-          redirectUri,
-          extraParams: { code_verifier: request.codeVerifier ?? "" },
-        },
-        discovery
-      );
+      let tokenResponse;
+      try {
+        tokenResponse = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: AUTH0_CLIENT_ID,
+            code: result.params.code,
+            redirectUri,
+            extraParams: { code_verifier: request.codeVerifier ?? "" },
+          },
+          discovery
+        );
+      } catch (e) {
+        // A bare 401/"Unauthorized" here (no OAuth error_description) usually
+        // means the Auth0 Application is configured as a confidential client
+        // (Application Type: Regular Web App) and is being asked for a
+        // client secret this public/native app can't provide — switch its
+        // Application Type to "Native" in the Auth0 dashboard.
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(
+          `Token exchange failed: ${message}. If this says "Unauthorized" with no ` +
+            `further detail, check the Auth0 Application's Application Type is set to ` +
+            `"Native", not "Regular Web Application".`
+        );
+      }
       return tokenResponse.idToken ?? null;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
