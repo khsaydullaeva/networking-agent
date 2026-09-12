@@ -101,15 +101,15 @@ Login ──(first login, no plans)──► Plans setup ──┐
                                                      ▼
                           ┌──────────────────────────────────────────────────┐
                           │                (tabs) bottom tab bar              │
-                          │   Dashboard   Profile   Scan QR   Map             │
+                          │   Dashboard   Map   Scan QR   Profile           │
                           └──────────────────────────────────────────────────┘
                                                      │
                         Scan QR tab ──(scan/manual success)──► Capture context ──► Connection detail
 ```
 
 The tab bar (`app/(tabs)/_layout.tsx`, an `expo-router` `<Tabs>` layout)
-is the app's home once logged in — Dashboard, Profile, Connect ("Scan
-QR"), and Map are siblings there, in that order. Login, Plans setup,
+is the app's home once logged in — Dashboard, Map, Connect ("Scan QR"),
+and Profile are siblings there, in that order. Login, Plans setup,
 Capture context, and Connection detail are full-screen flow steps outside
 the tab bar (pushed on top of it, same as any stack screen).
 
@@ -241,7 +241,7 @@ testing plans/dashboard/connect without a live Auth0 tenant at all.
 - [ ] Saving your own links on the Profile tab persists (reload and
       they're still there) and shows up in your QR code for the next
       person you connect with
-- [ ] All four tabs (Dashboard, Profile, Scan QR, Map) are reachable from
+- [ ] All four tabs (Dashboard, Map, Scan QR, Profile) are reachable from
       the bottom tab bar at all times once logged in
 - [ ] The celebration popup fires with a real animation (not an instant
       number change) both when adding a connection and when completing a

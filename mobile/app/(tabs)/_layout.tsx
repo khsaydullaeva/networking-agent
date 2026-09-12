@@ -19,10 +19,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="map"
         options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" color={color} size={size} />,
+          title: "Map",
+          tabBarIcon: ({ color, size }) => <Ionicons name="git-network" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -33,10 +33,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="map"
+        name="profile"
         options={{
-          title: "Map",
-          tabBarIcon: ({ color, size }) => <Ionicons name="git-network" color={color} size={size} />,
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" color={color} size={size} />,
         }}
       />
     </Tabs>
