@@ -22,6 +22,7 @@ DEMO_QUESTS = [
         "directly to what you discussed — ask how their approach compares.",
         "draft_message": "Hey! Loved hearing about your sparse routing work — would love to dig in more.",
         "xp": 10,
+        "due_days": 3,
     },
     {
         "type": "read",
@@ -29,5 +30,6 @@ DEMO_QUESTS = [
         "why_now": "You can reference specifics from it next time you talk.",
         "draft_message": None,
         "xp": 5,
+        "due_days": 2,
     },
 ]

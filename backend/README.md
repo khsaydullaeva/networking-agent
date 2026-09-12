@@ -148,6 +148,12 @@ which provider is active. If the agent call fails or times out, fall back
 to a single generic quest ("Send a follow-up message") rather than
 blocking the connection from appearing at all.
 
+Each returned quest's `due_days` (an integer, "do this within N days") is
+converted to an absolute `due_at` timestamp via `due_at_from_days()`
+before storing — store the absolute timestamp, not the relative day
+count, so mobile's urgency UI (`components/QuestLogCard.tsx`) doesn't
+have to know when the quest was created.
+
 ---
 
 ## 4. Warmth calculation — deterministic, no LLM

@@ -156,6 +156,9 @@ def test_get_connection_includes_quests(client):
     body = resp.json()
     assert body["enrichment"] is not None
     assert len(body["quests"]) >= 1
+    # regression: due_at was always stored as null, dropping the agent's
+    # due_days on the floor -- see backend/app/main.py due_at_from_days()
+    assert all(q["due_at"] is not None for q in body["quests"])
 
 
 def test_list_connections_by_owner(client):

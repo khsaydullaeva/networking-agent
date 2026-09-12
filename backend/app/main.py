@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 
@@ -22,6 +22,12 @@ def demo_mode() -> bool:
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def due_at_from_days(due_days: int | None) -> str | None:
+    if due_days is None:
+        return None
+    return (datetime.now(timezone.utc) + timedelta(days=due_days)).isoformat()
 
 
 def goals_to_plans(goals: list[str]) -> list[dict]:
@@ -134,6 +140,7 @@ async def _run_enrichment(connection_id: str):
     await db.connections.update_one({"_id": connection_id}, {"$set": {"enrichment": enrichment}})
 
     for q in result["quests"]:
+        due_days = q.get("due_days")
         await db.quests.insert_one(
             {
                 "owner_id": connection["owner_id"],
@@ -145,7 +152,7 @@ async def _run_enrichment(connection_id: str):
                 "status": "pending",
                 "plan_id": None,
                 "xp": 10,
-                "due_at": None,
+                "due_at": due_at_from_days(due_days),
             }
         )
 
@@ -201,7 +208,7 @@ async def create_connection(body: ConnectionCreate, background_tasks: Background
                     "status": "pending",
                     "plan_id": None,
                     "xp": q["xp"],
-                    "due_at": None,
+                    "due_at": due_at_from_days(q.get("due_days")),
                 }
             )
         doc = await db.connections.find_one({"_id": connection_id})
