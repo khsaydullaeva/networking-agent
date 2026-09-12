@@ -81,9 +81,15 @@ before cutting these:
 // users
 {
   "_id": "ObjectId",
-  "auth0_id": "string | null",   // null until Auth0 is wired in (see backend/README)
+  "auth0_id": "string | null",   // set once the user logs in via Auth0 (LinkedIn social connection)
   "name": "string",
-  "goals": ["string"],           // e.g. "ML internship", "cofounder", "friendship"
+  "plans": [                     // "improvement plans" — was a plain string[] of goals;
+    {                            // now a real entity so quests can link to one
+      "id": "string",
+      "title": "string",        // e.g. "ML internship", "cofounder", "friendship"
+      "status": "active | done"
+    }
+  ],
   "links": { "linkedin": "url", "github": "url", "twitter": "url" },
   "xp": 0,
   "streak": 0
@@ -127,6 +133,7 @@ before cutting these:
   "why_now": "string",            // must reference a specific enrichment fact
   "draft_message": "string | null",
   "status": "pending | completed",
+  "plan_id": "string | null",     // links this follow-up task to one of the user's plans
   "xp": 0,
   "due_at": "ISO8601"
 }

@@ -78,6 +78,17 @@ acceptable for MVP, no need for websockets.
 List all connections for the map screen, each including computed
 `warmth` (see §4).
 
+### `GET /quests?owner_id=`
+All follow-up tasks for a user across every connection, regardless of
+status — the dashboard's task feed.
+
+### `POST /quests/:id/link-plan`
+```jsonc
+// request: { "plan_id": "string | null" }   // null unlinks
+// response: full quest object with plan_id updated
+```
+404s if `plan_id` doesn't match one of the owner's plans.
+
 ### `POST /quests/:id/complete`
 ```jsonc
 // request: {}
@@ -85,6 +96,22 @@ List all connections for the map screen, each including computed
 ```
 Also updates `last_touch` on the parent connection so warmth recalculates
 fresh.
+
+### `GET /users/:id`
+Full user object, including `plans`.
+
+### `POST /users/:id/plans`
+```jsonc
+// request: { "title": "string" }
+// response: { "id": "string", "title": "string", "status": "active" }
+```
+Appends a new "improvement plan" (root README.md §3) to the user. Quests
+link to a plan's `id` via `POST /quests/:id/link-plan`.
+
+### `POST /auth/session`
+Requires `Authorization: Bearer <auth0_id_token>` (see §6). Gets-or-creates
+the local user row keyed by the token's `sub` claim. Call this right after
+a successful Auth0/LinkedIn login on the client, in place of `POST /users`.
 
 ---
 
@@ -97,7 +124,7 @@ result = await enrich_and_generate_quests(
     person=connection["person"],
     met_context=connection["met"],
     notes=connection["notes"],
-    user_goals=user["goals"],
+    user_goals=[p["title"] for p in user["plans"]],
 )
 # result: { "enrichment": {...}, "quests": [...] }  — validated JSON, see agent/README.md
 ```
@@ -143,11 +170,24 @@ before you go on stage.
 
 ---
 
-## 6. Auth0 — wire in last
+## 6. Auth0 — LinkedIn login
 
-Build every endpoint against a hardcoded `owner_id` string first. Add
-Auth0 JWT verification as a dependency (`Depends(verify_token)`) only once
-the rest of the API is working end-to-end with mobile, roughly hour 18-20.
+`app/auth.py`'s `verify_token` dependency verifies an Auth0-issued ID
+token (RS256, signature checked against `https://$AUTH0_DOMAIN/.well-known/jwks.json`,
+`aud` checked against `AUTH0_CLIENT_ID`). `POST /auth/session` is the only
+endpoint that uses it today — mobile logs in via Auth0 Universal Login
+with LinkedIn as the social connection, then sends the resulting ID token
+as the bearer token to get-or-create its user row.
+
+**One manual step required**: enable LinkedIn as a social connection in
+your Auth0 dashboard (Authentication → Social → LinkedIn) — this backend
+code doesn't need separate LinkedIn API credentials, Auth0 handles that
+once the connection is turned on.
+
+Every other endpoint still takes a plain `owner_id`/`user_id` string, not
+`Depends(verify_token)` — mobile passes whatever id `POST /auth/session`
+returned. Add `Depends(verify_token)` to more endpoints only if you need
+per-request authorization beyond "the client already logged in once."
 
 ---
 

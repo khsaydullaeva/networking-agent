@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import db as db_module
+from backend.app.auth import verify_token
 from backend.app.main import app
 
 
@@ -33,7 +34,76 @@ def test_create_user(client):
     body = resp.json()
     assert body["name"] == "Alice"
     assert body["xp"] == 0
-    assert "id" in body
+    assert body["plans"] == [{"id": body["plans"][0]["id"], "title": "ML internship", "status": "active"}]
+
+
+def test_add_plan_to_user(client):
+    user = client.post("/users", json={"name": "Alice", "goals": [], "links": {}}).json()
+    resp = client.post(f"/users/{user['id']}/plans", json={"title": "Land a robotics internship"})
+    assert resp.status_code == 201
+    plan = resp.json()
+    assert plan["title"] == "Land a robotics internship"
+    assert plan["status"] == "active"
+
+    fetched = client.get(f"/users/{user['id']}").json()
+    assert len(fetched["plans"]) == 1
+    assert fetched["plans"][0]["id"] == plan["id"]
+
+
+def test_list_quests_and_link_to_plan(client):
+    user = client.post("/users", json={"name": "Bob", "goals": ["Cofounder"], "links": {}}).json()
+    plan_id = user["plans"][0]["id"]
+    client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "P", "org": "", "links": {}},
+            "met": {"context_type": "work"},
+            "notes": [],
+        },
+    )
+
+    quests = client.get(f"/quests?owner_id={user['id']}").json()
+    assert len(quests) >= 1
+    quest_id = quests[0]["id"]
+
+    resp = client.post(f"/quests/{quest_id}/link-plan", json={"plan_id": plan_id})
+    assert resp.status_code == 200
+    assert resp.json()["plan_id"] == plan_id
+
+    # linking to a plan that doesn't exist is rejected
+    bad = client.post(f"/quests/{quest_id}/link-plan", json={"plan_id": "nonexistent"})
+    assert bad.status_code == 404
+
+    # unlinking (plan_id: null) is allowed
+    unlink = client.post(f"/quests/{quest_id}/link-plan", json={"plan_id": None})
+    assert unlink.status_code == 200
+    assert unlink.json()["plan_id"] is None
+
+
+def test_auth_session_gets_or_creates_user_by_auth0_sub(client):
+    """Doesn't hit real Auth0 — verify_token is overridden to simulate an
+    already-verified ID token, so this exercises the get-or-create logic
+    in isolation from JWKS/network verification."""
+    app.dependency_overrides[verify_token] = lambda: {"sub": "auth0|abc123", "name": "Priya"}
+    try:
+        first = client.post("/auth/session")
+        assert first.status_code == 200
+        body = first.json()
+        assert body["name"] == "Priya"
+        assert body["auth0_id"] == "auth0|abc123"
+        assert body["plans"] == []
+
+        second = client.post("/auth/session")
+        assert second.status_code == 200
+        assert second.json()["id"] == body["id"]  # same user returned, not duplicated
+    finally:
+        app.dependency_overrides.pop(verify_token, None)
+
+
+def test_auth_session_without_token_is_rejected(client):
+    resp = client.post("/auth/session")
+    assert resp.status_code == 401
 
 
 def test_create_connection_returns_immediately_with_demo_enrichment(client):
@@ -135,7 +205,7 @@ async def test_run_enrichment_translates_agent_facts_to_shared_shape(monkeypatch
 
     db_module._db = None
     db = db_module.get_db()
-    user = await db.users.insert_one({"name": "U", "goals": [], "xp": 0})
+    user = await db.users.insert_one({"name": "U", "plans": [], "xp": 0})
     conn = await db.connections.insert_one(
         {
             "owner_id": user["_id"],

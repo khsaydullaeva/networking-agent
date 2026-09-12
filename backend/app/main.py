@@ -1,12 +1,14 @@
 import os
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 
 from .agent_client import enrich_and_generate_quests
+from .auth import verify_token
 from .db import get_db, serialize
 from .demo_fixtures import DEMO_ENRICHMENT, DEMO_QUESTS
-from .models import ConnectionCreate, UserCreate
+from .models import ConnectionCreate, LinkQuestToPlan, PlanCreate, UserCreate
 from .warmth import warmth_for_connection
 
 app = FastAPI(title="Networking Agent Backend")
@@ -20,13 +22,19 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def goals_to_plans(goals: list[str]) -> list[dict]:
+    return [{"id": str(uuid.uuid4()), "title": title, "status": "active"} for title in goals]
+
+
 @app.post("/users", status_code=201)
 async def create_user(body: UserCreate):
+    """Manual/dev user creation — no login required. Prefer POST /auth/session
+    once Auth0/LinkedIn login is wired in on the client (see §6/§7 below)."""
     db = get_db()
     doc = await db.users.insert_one(
         {
             "name": body.name,
-            "goals": body.goals,
+            "plans": goals_to_plans(body.goals),
             "links": body.links.model_dump(exclude_none=True),
             "auth0_id": None,
             "xp": 0,
@@ -36,13 +44,58 @@ async def create_user(body: UserCreate):
     return serialize(doc)
 
 
+@app.post("/auth/session")
+async def auth_session(claims: dict = Depends(verify_token)):
+    """Called right after a successful Auth0/LinkedIn login on the client,
+    with the Auth0 ID token as the bearer token. Gets-or-creates the local
+    user row keyed by the token's `sub` (Auth0's stable user id)."""
+    db = get_db()
+    auth0_id = claims["sub"]
+    existing = await db.users.find_one({"auth0_id": auth0_id})
+    if existing:
+        return serialize(existing)
+
+    doc = await db.users.insert_one(
+        {
+            "name": claims.get("name") or claims.get("nickname") or "New user",
+            "plans": [],
+            "links": {},
+            "auth0_id": auth0_id,
+            "xp": 0,
+            "streak": 0,
+        }
+    )
+    return serialize(doc)
+
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: str):
+    db = get_db()
+    doc = await db.users.find_one({"_id": user_id})
+    if doc is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return serialize(doc)
+
+
+@app.post("/users/{user_id}/plans", status_code=201)
+async def create_plan(user_id: str, body: PlanCreate):
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id})
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    plan = {"id": str(uuid.uuid4()), "title": body.title, "status": "active"}
+    plans = user.get("plans", []) + [plan]
+    await db.users.update_one({"_id": user_id}, {"$set": {"plans": plans}})
+    return plan
+
+
 async def _run_enrichment(connection_id: str):
     db = get_db()
     connection = await db.connections.find_one({"_id": connection_id})
     if connection is None:
         return
     user = await db.users.find_one({"_id": connection["owner_id"]})
-    user_goals = user["goals"] if user else []
+    user_goals = [p["title"] for p in user["plans"]] if user else []
 
     result = await enrich_and_generate_quests(
         person=connection["person"],
@@ -72,6 +125,7 @@ async def _run_enrichment(connection_id: str):
                 "why_now": q["why_now"],
                 "draft_message": q.get("draft_message"),
                 "status": "pending",
+                "plan_id": None,
                 "xp": 10,
                 "due_at": None,
             }
@@ -105,6 +159,7 @@ async def create_connection(body: ConnectionCreate, background_tasks: Background
                     "why_now": q["why_now"],
                     "draft_message": q["draft_message"],
                     "status": "pending",
+                    "plan_id": None,
                     "xp": q["xp"],
                     "due_at": None,
                 }
@@ -141,6 +196,30 @@ async def list_connections(owner_id: str):
         item["warmth"] = warmth_for_connection(doc)
         results.append(item)
     return results
+
+
+@app.get("/quests")
+async def list_quests(owner_id: str):
+    """All follow-up tasks for a user across every connection — the
+    dashboard's main feed, independent of which connection they came from."""
+    db = get_db()
+    quests = await db.quests.find({"owner_id": owner_id})
+    return [serialize(q) for q in quests]
+
+
+@app.post("/quests/{quest_id}/link-plan")
+async def link_quest_to_plan(quest_id: str, body: LinkQuestToPlan):
+    db = get_db()
+    quest = await db.quests.find_one({"_id": quest_id})
+    if quest is None:
+        raise HTTPException(status_code=404, detail="Quest not found")
+    if body.plan_id is not None:
+        user = await db.users.find_one({"_id": quest["owner_id"]})
+        if user is None or not any(p["id"] == body.plan_id for p in user.get("plans", [])):
+            raise HTTPException(status_code=404, detail="Plan not found")
+    await db.quests.update_one({"_id": quest_id}, {"$set": {"plan_id": body.plan_id}})
+    updated = await db.quests.find_one({"_id": quest_id})
+    return serialize(updated)
 
 
 @app.post("/quests/{quest_id}/complete")

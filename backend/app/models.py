@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 ContextType = Literal["conference", "club", "orientation", "campus", "work", "other"]
 QuestType = Literal["message", "read", "meet", "share"]
 QuestStatus = Literal["pending", "completed"]
+PlanStatus = Literal["active", "done"]
 
 
 class Links(BaseModel):
@@ -15,14 +16,27 @@ class Links(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class Plan(BaseModel):
+    id: str
+    title: str
+    status: PlanStatus = "active"
+
+
+class PlanCreate(BaseModel):
+    title: str
+
+
 class UserCreate(BaseModel):
     name: str
     goals: list[str] = Field(default_factory=list)
     links: Links = Field(default_factory=Links)
 
 
-class User(UserCreate):
+class User(BaseModel):
     id: str
+    name: str
+    plans: list[Plan] = Field(default_factory=list)
+    links: Links = Field(default_factory=Links)
     auth0_id: str | None = None
     xp: int = 0
     streak: int = 0
@@ -82,5 +96,10 @@ class Quest(BaseModel):
     why_now: str
     draft_message: str | None = None
     status: QuestStatus = "pending"
+    plan_id: str | None = None
     xp: int = 10
     due_at: str | None = None
+
+
+class LinkQuestToPlan(BaseModel):
+    plan_id: str | None
