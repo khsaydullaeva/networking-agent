@@ -7,6 +7,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from .agent_client import enrich_and_generate_quests
 from .auth import verify_token
 from .db import get_db, serialize
+from .dedupe import find_existing_connection
 from .demo_fixtures import DEMO_ENRICHMENT, DEMO_QUESTS
 from .gamification import CONNECTION_XP, award_xp
 from .models import ConnectionCreate, LinkQuestToPlan, Links, PlanCreate, UserCreate
@@ -152,10 +153,32 @@ async def _run_enrichment(connection_id: str):
 @app.post("/connections", status_code=201)
 async def create_connection(body: ConnectionCreate, background_tasks: BackgroundTasks):
     db = get_db()
+    person_dict = body.person.model_dump(exclude_none=True)
+
+    # Same person, scanned or typed again: merge into the existing
+    # connection instead of creating a duplicate card. Matched by name
+    # (case-insensitive) or any shared link URL.
+    existing_docs = await db.connections.find({"owner_id": body.owner_id})
+    match = find_existing_connection(existing_docs, person_dict)
+    if match is not None:
+        merged_person = {**match["person"], "links": {**match["person"].get("links", {}), **person_dict.get("links", {})}}
+        await db.connections.update_one(
+            {"_id": match["_id"]},
+            {"$set": {"person": merged_person, "notes": match["notes"] + body.notes, "last_touch": now_iso()}},
+        )
+        doc = await db.connections.find_one({"_id": match["_id"]})
+        result = serialize(doc)
+        result["warmth"] = warmth_for_connection(doc)
+        result["merged"] = True
+        xp_result = await award_xp(db, body.owner_id, CONNECTION_XP)
+        if xp_result:
+            result.update(xp_result)
+        return result
+
     doc = await db.connections.insert_one(
         {
             "owner_id": body.owner_id,
-            "person": body.person.model_dump(exclude_none=True),
+            "person": person_dict,
             "met": body.met.model_dump(exclude_none=True),
             "notes": body.notes,
             "enrichment": None,
@@ -187,6 +210,7 @@ async def create_connection(body: ConnectionCreate, background_tasks: Background
 
     result = serialize(doc)
     result["warmth"] = warmth_for_connection(doc)
+    result["merged"] = False
 
     # Adding a connection is itself an XP-awarding, streak-building action
     # -- "the score goes up when you leave the app" starts here, not only

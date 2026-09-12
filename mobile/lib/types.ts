@@ -79,6 +79,10 @@ export interface Connection {
   warmth: number;
   last_touch: string | null;
   quests?: Quest[];
+  // Only present on the POST /connections response: true if this same
+  // person (by name or a shared link) already existed and the new note
+  // was merged into that connection instead of creating a duplicate.
+  merged?: boolean;
 }
 
 // Every XP-awarding action (creating a connection, completing a quest)

@@ -62,12 +62,24 @@ wait synchronously for the LLM + search round trip).
   "met": { "lat": 0.0, "lng": 0.0, "context_type": "conference" },
   "notes": ["string"]
 }
-// response: 201, connection object with enrichment: null, quests not yet created
+// response: 201, connection object with enrichment: null, quests not yet
+// created, plus xp_awarded/new_total_xp/streak and merged: false
 ```
 Internally: write the connection row immediately (status visible to the
 user right away), then call `agent.enrich_and_generate_quests(connection)`
 in the background, then update the row and insert quest documents when it
 returns.
+
+**Dedupe first** (`app/dedupe.py`): before creating anything, check
+whether `person` matches an existing connection for this `owner_id` — by
+name (case-insensitive) or by sharing any link URL. If it does, this is
+the same person met again: merge the new `notes` onto the existing
+connection, update `last_touch`, merge in any new links, and return that
+existing connection (`merged: true`, same `id` as before) instead of
+creating a duplicate card. No new enrichment/quest generation runs on a
+merge — existing enrichment/quests stay as they are. XP is still awarded
+either way; reconnecting with someone is a real action worth the same 5
+points as a first connection (`app/gamification.py` §5).
 
 ### `GET /connections/:id`
 Returns the full connection including `enrichment` (null until the
@@ -250,3 +262,6 @@ per-request authorization beyond "the client already logged in once."
 - [ ] Creating a connection and completing a quest both return
       `xp_awarded`/`new_total_xp`/`streak`, and two actions on the same
       UTC day don't double-increment the streak
+- [ ] Connecting with the same name (or a shared link) twice merges into
+      one connection (`merged: true`, same `id`) instead of creating a
+      duplicate card

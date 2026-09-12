@@ -129,6 +129,18 @@ export async function linkQuestToPlan(questId: string, planId: string | null): P
   });
 }
 
+// Mirrors backend/app/dedupe.py: same person if the name matches
+// (case-insensitive) or any link URL is shared.
+function findExistingFixtureConnection(ownerId: string, person: Connection["person"]): Connection | undefined {
+  const name = person.name.trim().toLowerCase();
+  const links = new Set(Object.values(person.links ?? {}).filter(Boolean));
+  return fixtureConnections.find((c) => {
+    if (c.owner_id !== ownerId) return false;
+    if (name && c.person.name.trim().toLowerCase() === name) return true;
+    return Object.values(c.person.links ?? {}).some((url) => url && links.has(url));
+  });
+}
+
 export async function createConnection(input: {
   owner_id: string;
   person: Connection["person"];
@@ -136,6 +148,14 @@ export async function createConnection(input: {
   notes: string[];
 }): Promise<Connection & GamificationResult> {
   if (USE_FIXTURES) {
+    const existing = findExistingFixtureConnection(input.owner_id, input.person);
+    if (existing) {
+      existing.person = { ...existing.person, links: { ...existing.person.links, ...input.person.links } };
+      existing.notes = [...existing.notes, ...input.notes];
+      existing.last_touch = new Date().toISOString();
+      return { ...existing, merged: true, ...awardFixtureXp(FIXTURE_CONNECTION_XP) };
+    }
+
     const conn: Connection = {
       id: `local-${Date.now()}`,
       owner_id: input.owner_id,
@@ -171,7 +191,7 @@ export async function createConnection(input: {
         },
       ];
     }, 2000);
-    return { ...conn, ...awardFixtureXp(FIXTURE_CONNECTION_XP) };
+    return { ...conn, merged: false, ...awardFixtureXp(FIXTURE_CONNECTION_XP) };
   }
   return request<Connection & GamificationResult>("/connections", {
     method: "POST",

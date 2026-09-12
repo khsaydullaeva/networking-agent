@@ -184,6 +184,63 @@ def test_list_connections_by_owner(client):
     assert len(resp.json()) == 2
 
 
+def test_reconnecting_with_same_name_merges_instead_of_duplicating(client):
+    user = client.post("/users", json={"name": "Fay", "goals": [], "links": {}}).json()
+    first = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "harsh", "org": "", "links": {}},
+            "met": {"context_type": "conference"},
+            "notes": ["met at career fair"],
+        },
+    ).json()
+    assert first["merged"] is False
+
+    # different case, adds a link this time -- still the same person
+    second = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "Harsh", "org": "", "links": {"linkedin": "https://linkedin.com/in/harsh"}},
+            "met": {"context_type": "conference"},
+            "notes": ["do robotics project together"],
+        },
+    ).json()
+    assert second["merged"] is True
+    assert second["id"] == first["id"]  # same connection, not a new one
+    assert second["notes"] == ["met at career fair", "do robotics project together"]
+    assert second["person"]["links"]["linkedin"] == "https://linkedin.com/in/harsh"
+
+    all_connections = client.get(f"/connections?owner_id={user['id']}").json()
+    assert len(all_connections) == 1  # no duplicate card
+
+
+def test_reconnecting_via_shared_link_merges_even_with_different_name(client):
+    user = client.post("/users", json={"name": "Gia", "goals": [], "links": {}}).json()
+    first = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "H. Aditya", "org": "", "links": {"linkedin": "https://linkedin.com/in/harsh"}},
+            "met": {"context_type": "conference"},
+            "notes": [],
+        },
+    ).json()
+
+    second = client.post(
+        "/connections",
+        json={
+            "owner_id": user["id"],
+            "person": {"name": "Harshvardhan Aditya", "org": "", "links": {"linkedin": "https://linkedin.com/in/harsh"}},
+            "met": {"context_type": "conference"},
+            "notes": ["ran into him again"],
+        },
+    ).json()
+    assert second["merged"] is True
+    assert second["id"] == first["id"]
+
+
 def test_connection_and_quest_completion_both_award_xp_and_streak(client):
     user = client.post("/users", json={"name": "Eve", "goals": [], "links": {}}).json()
     assert user["xp"] == 0

@@ -30,7 +30,9 @@ export default function CaptureContext() {
   const recorderState = useAudioRecorderState(recorder);
   const [voiceNoteUri, setVoiceNoteUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [celebration, setCelebration] = useState<{ xp: number; streak: number; connectionId: string } | null>(null);
+  const [celebration, setCelebration] = useState<{ xp: number; streak: number; connectionId: string; merged: boolean } | null>(
+    null
+  );
 
   useEffect(() => {
     (async () => {
@@ -79,7 +81,12 @@ export default function CaptureContext() {
         notes,
       });
       setUser({ ...user, xp: connection.new_total_xp, streak: connection.streak });
-      setCelebration({ xp: connection.xp_awarded, streak: connection.streak, connectionId: connection.id });
+      setCelebration({
+        xp: connection.xp_awarded,
+        streak: connection.streak,
+        connectionId: connection.id,
+        merged: !!connection.merged,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +118,7 @@ export default function CaptureContext() {
         visible={!!celebration}
         xp={celebration?.xp ?? 0}
         streak={celebration?.streak ?? 0}
-        label="New connection!"
+        label={celebration?.merged ? "Reconnected!" : "New connection!"}
         onDone={handleCelebrationDone}
       />
       <ScrollView className="px-6 pt-8" contentContainerStyle={{ paddingBottom: 32 }}>
