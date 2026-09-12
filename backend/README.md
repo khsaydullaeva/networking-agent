@@ -1,4 +1,4 @@
-# backend/ — FastAPI + MongoDB Atlas (Claude Code context for this folder)
+# backend/ — FastAPI + PostgreSQL (Claude Code context for this folder)
 
 You are implementing the API layer between the mobile app and the AI agent.
 Read the root `README.md` first for the shared data model — this file does
@@ -16,15 +16,22 @@ isolation).
 ## 1. Stack
 
 - FastAPI + `uvicorn`
-- `motor` (async MongoDB driver) against MongoDB Atlas
+- `asyncpg` (async Postgres driver) against a hosted Postgres instance —
+  Neon, Supabase, Railway, or Vultr Managed Database all have a free/cheap
+  tier that works fine for MVP
 - `pydantic` v2 models mirroring the shared data model exactly
+- Each document (user/connection/quest) is stored as a single JSONB blob
+  in an `id, doc` table — this keeps the shared JSON data model in §3 as
+  the single source of truth without hand-writing a relational schema for
+  a 24h hackathon; Postgres's JSONB containment (`@>`) covers our find-by-field
+  queries
 - Deploy: a single Vultr instance is enough for MVP; run locally on your
   laptop for most of the hackathon and only deploy near the end if you
   want the sponsor credit story for the pitch
 
 ```bash
 python -m venv venv && source venv/bin/activate
-pip install fastapi uvicorn motor pydantic python-dotenv
+pip install fastapi uvicorn asyncpg pydantic python-dotenv
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 

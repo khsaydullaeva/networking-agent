@@ -8,7 +8,7 @@
 
 Hackathon: HackCMU (MLH). Track: **Multiplayer / Touch the Grass** (optionally
 combined with **Institute of Foundation Models (IFM)**). Sponsors targeted:
-**IFM**, **Querit.ai**, ElevenLabs, MongoDB Atlas, Auth0, Vultr.
+**IFM**, **Querit.ai**, ElevenLabs, Auth0, Vultr.
 
 This is the root README. Each implementation layer has its own README meant
 to be dropped into Claude Code as the working context for that folder. Work
@@ -57,8 +57,8 @@ before cutting these:
                                              │                                  │
                                              ▼                                  ▼
                                       ┌─────────────┐                   ┌───────────────┐
-                                      │ MongoDB     │                   │ Querit.ai      │
-                                      │ Atlas       │                   │ (search)       │
+                                      │ PostgreSQL  │                   │ Querit.ai      │
+                                      │ (JSONB)     │                   │ (search)       │
                                       └─────────────┘                   │ LLM provider   │
                                                                          │ (K2/Gemini/    │
                                                                          │  Grok — see    │
@@ -141,7 +141,7 @@ Full JSON Schemas for what the agent must return live in `agent/README.md`.
 
 | Var | Used by | Notes |
 |---|---|---|
-| `MONGODB_URI` | backend | Atlas connection string |
+| `DATABASE_URL` | backend | Postgres connection string (Neon/Supabase/Railway/Vultr) |
 | `BACKEND_URL` | mobile | e.g. `http://<laptop-ip>:8000` for Expo Go on physical devices |
 | `QUERIT_API_KEY` | agent | https://www.querit.ai/en/dashboard |
 | `LLM_PROVIDER` | agent | `k2` \| `gemini` \| `grok` — see `agent/README.md` |
@@ -161,7 +161,7 @@ Full JSON Schemas for what the agent must return live in `agent/README.md`.
 | P4 | `agent/` | Hour 0 | nothing — build against 5 hand-written fake profiles before touching real Querit/LLM calls |
 
 **Hour 10 checkpoint:** two phones connecting must produce a real row in
-Atlas. If this isn't true, stop everything else and fix only this.
+Postgres. If this isn't true, stop everything else and fix only this.
 
 **Hour 20:** feature freeze. Rehearse the demo, record a backup video in
 case venue wifi dies.

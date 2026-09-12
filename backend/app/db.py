@@ -1,13 +1,14 @@
+import asyncio
+import json
 import os
-from typing import Any
 from uuid import uuid4
 
 
 class InMemoryCollection:
-    """Mimics the subset of motor's AsyncIOMotorCollection API this app
-    uses. Used when MONGODB_URI isn't set, so the API runs and is testable
-    on a laptop with zero Atlas setup — swap in real Atlas any time by
-    setting MONGODB_URI, no application code changes needed.
+    """Mimics the subset of the Postgres-backed collection API this app
+    uses. Used when DATABASE_URL isn't set, so the API runs and is
+    testable on a laptop with zero Postgres setup — point DATABASE_URL at
+    a real instance any time, no application code changes needed.
     """
 
     def __init__(self):
@@ -40,17 +41,101 @@ class InMemoryCollection:
         return all(doc.get(k) == v for k, v in query.items())
 
 
+class PostgresJSONCollection:
+    """Stores each document as a JSONB blob in a single `id, doc` table.
+
+    This keeps the shared JSON data model (root README.md §3) as the
+    single source of truth without hand-writing a relational schema per
+    collection for a 24h hackathon — Postgres's JSONB containment operator
+    (`@>`) gives us find-by-field queries almost for free. `table` is
+    created lazily on first use.
+    """
+
+    def __init__(self, pool_getter, table: str):
+        self._pool_getter = pool_getter
+        self._table = table
+        self._ensured = False
+
+    async def _ensure_table(self, conn):
+        if self._ensured:
+            return
+        await conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self._table} (
+                id TEXT PRIMARY KEY,
+                doc JSONB NOT NULL
+            )
+            """
+        )
+        self._ensured = True
+
+    async def insert_one(self, doc: dict) -> dict:
+        doc = dict(doc)
+        doc.setdefault("_id", str(uuid4()))
+        pool = await self._pool_getter()
+        async with pool.acquire() as conn:
+            await self._ensure_table(conn)
+            await conn.execute(
+                f"INSERT INTO {self._table} (id, doc) VALUES ($1, $2)",
+                doc["_id"],
+                json.dumps(doc),
+            )
+        return doc
+
+    async def find_one(self, query: dict) -> dict | None:
+        pool = await self._pool_getter()
+        async with pool.acquire() as conn:
+            await self._ensure_table(conn)
+            row = await conn.fetchrow(
+                f"SELECT doc FROM {self._table} WHERE doc @> $1::jsonb LIMIT 1",
+                json.dumps(query),
+            )
+        return json.loads(row["doc"]) if row else None
+
+    async def find(self, query: dict) -> list[dict]:
+        pool = await self._pool_getter()
+        async with pool.acquire() as conn:
+            await self._ensure_table(conn)
+            rows = await conn.fetch(
+                f"SELECT doc FROM {self._table} WHERE doc @> $1::jsonb",
+                json.dumps(query),
+            )
+        return [json.loads(row["doc"]) for row in rows]
+
+    async def update_one(self, query: dict, update: dict) -> None:
+        doc = await self.find_one(query)
+        if doc is None:
+            return
+        doc.update(update.get("$set", {}))
+        pool = await self._pool_getter()
+        async with pool.acquire() as conn:
+            await self._ensure_table(conn)
+            await conn.execute(
+                f"UPDATE {self._table} SET doc = $2::jsonb WHERE id = $1",
+                doc["_id"],
+                json.dumps(doc),
+            )
+
+
 class Database:
     def __init__(self):
-        uri = os.environ.get("MONGODB_URI")
-        if uri:
-            from motor.motor_asyncio import AsyncIOMotorClient
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url:
+            import asyncpg
 
-            client = AsyncIOMotorClient(uri)
-            db = client.get_default_database("networking_agent")
-            self.users = db["users"]
-            self.connections = db["connections"]
-            self.quests = db["quests"]
+            self._pool = None
+            self._pool_lock = asyncio.Lock()
+
+            async def get_pool():
+                if self._pool is None:
+                    async with self._pool_lock:
+                        if self._pool is None:
+                            self._pool = await asyncpg.create_pool(database_url)
+                return self._pool
+
+            self.users = PostgresJSONCollection(get_pool, "users")
+            self.connections = PostgresJSONCollection(get_pool, "connections")
+            self.quests = PostgresJSONCollection(get_pool, "quests")
         else:
             self.users = InMemoryCollection()
             self.connections = InMemoryCollection()
@@ -68,7 +153,7 @@ def get_db() -> Database:
 
 
 def serialize(doc: dict) -> dict:
-    """Converts a raw Mongo-shaped document (using `_id`) to the API shape
+    """Converts a raw stored document (using `_id`) to the API shape
     (using `id`)."""
     out = dict(doc)
     out["id"] = str(out.pop("_id"))
