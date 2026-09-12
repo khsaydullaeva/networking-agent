@@ -1,9 +1,16 @@
-import { Audio } from "expo-av";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 
 import { createConnection } from "@/lib/api";
 import { useStore } from "@/lib/store";
@@ -18,7 +25,8 @@ export default function CaptureContext() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [contextType, setContextType] = useState<ContextType>("conference");
   const [note, setNote] = useState("");
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
   const [voiceNoteUri, setVoiceNoteUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,18 +44,17 @@ export default function CaptureContext() {
   }, []);
 
   const startRecording = async () => {
-    const { status } = await Audio.requestPermissionsAsync();
-    if (status !== "granted") return;
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-    const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-    setRecording(rec);
+    const { granted } = await requestRecordingPermissionsAsync();
+    if (!granted) return;
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+    await recorder.prepareToRecordAsync();
+    recorder.record();
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
-    await recording.stopAndUnloadAsync();
-    setVoiceNoteUri(recording.getURI());
-    setRecording(null);
+    if (!recorderState.isRecording) return;
+    await recorder.stop();
+    setVoiceNoteUri(recorder.uri);
   };
 
   const handleSubmit = async () => {
@@ -130,10 +137,14 @@ export default function CaptureContext() {
         <Pressable
           onPressIn={startRecording}
           onPressOut={stopRecording}
-          className={`rounded-xl py-4 items-center mb-8 ${recording ? "bg-red-500" : "bg-gray-800"}`}
+          className={`rounded-xl py-4 items-center mb-8 ${recorderState.isRecording ? "bg-red-500" : "bg-gray-800"}`}
         >
           <Text className="text-white font-semibold text-base">
-            {recording ? "Recording... release to stop" : voiceNoteUri ? "Re-record voice note" : "Hold to record voice note"}
+            {recorderState.isRecording
+              ? "Recording... release to stop"
+              : voiceNoteUri
+                ? "Re-record voice note"
+                : "Hold to record voice note"}
           </Text>
         </Pressable>
 
