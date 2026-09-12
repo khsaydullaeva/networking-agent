@@ -57,5 +57,5 @@ export function useAuth0Login() {
     }
   };
 
-  return { login, loading, error, ready: !!discovery && !!request };
+  return { login, loading, error, ready: !!discovery && !!request, redirectUri };
 }
