@@ -10,6 +10,8 @@ PlanStatus = Literal["active", "done"]
 
 class Links(BaseModel):
     linkedin: str | None = None
+    instagram: str | None = None
+    facebook: str | None = None
     github: str | None = None
     twitter: str | None = None
 

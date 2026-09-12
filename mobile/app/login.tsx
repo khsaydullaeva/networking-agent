@@ -11,15 +11,15 @@ import { useStore } from "@/lib/store";
 export default function Login() {
   const router = useRouter();
   const { login } = useStore();
-  const { login: promptLinkedInLogin, loading, error, ready, redirectUri } = useAuth0Login();
+  const { login: promptAuth0Login, loading, error, ready, redirectUri } = useAuth0Login();
   const [signingIn, setSigningIn] = React.useState(false);
 
   const afterLogin = (plansCount: number) => {
     router.replace(plansCount === 0 ? "/plans-setup" : "/map");
   };
 
-  const handleLinkedInLogin = async () => {
-    const idToken = await promptLinkedInLogin();
+  const handleAuth0Login = async () => {
+    const idToken = await promptAuth0Login();
     if (!idToken) return;
     setSigningIn(true);
     try {
@@ -31,8 +31,7 @@ export default function Login() {
   };
 
   // Dev/demo shortcut — USE_FIXTURES skips real Auth0 so the app is fully
-  // testable before LinkedIn is enabled as an Auth0 social connection
-  // (backend/README.md §6).
+  // testable without a live tenant.
   const handleDevLogin = async () => {
     setSigningIn(true);
     try {
@@ -61,10 +60,10 @@ export default function Login() {
 
       <Pressable
         disabled={busy || (!ready && !USE_FIXTURES)}
-        onPress={handleLinkedInLogin}
-        className="w-full bg-[#0A66C2] rounded-xl py-4 items-center mb-3"
+        onPress={handleAuth0Login}
+        className="w-full bg-gray-900 rounded-xl py-4 items-center mb-3"
       >
-        {busy ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Continue with LinkedIn</Text>}
+        {busy ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Sign up / Log in</Text>}
       </Pressable>
 
       {USE_FIXTURES && (

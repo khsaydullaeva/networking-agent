@@ -1,9 +1,9 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { addPlan, linkQuestToPlan, listConnections, listQuests } from "@/lib/api";
+import { addPlan, linkQuestToPlan, listConnections, listQuests, updateLinks } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import type { Connection, Quest } from "@/lib/types";
 
@@ -14,6 +14,16 @@ export default function Dashboard() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [newPlanTitle, setNewPlanTitle] = useState("");
   const [linkingQuestId, setLinkingQuestId] = useState<string | null>(null);
+  const [linkedin, setLinkedin] = useState(user?.links.linkedin ?? "");
+  const [instagram, setInstagram] = useState(user?.links.instagram ?? "");
+  const [facebook, setFacebook] = useState(user?.links.facebook ?? "");
+  const [savingLinks, setSavingLinks] = useState(false);
+
+  useEffect(() => {
+    setLinkedin(user?.links.linkedin ?? "");
+    setInstagram(user?.links.instagram ?? "");
+    setFacebook(user?.links.facebook ?? "");
+  }, [user?.links.linkedin, user?.links.instagram, user?.links.facebook]);
 
   const refresh = useCallback(() => {
     if (!user) return;
@@ -42,6 +52,20 @@ export default function Dashboard() {
     setLinkingQuestId(null);
   };
 
+  const handleSaveLinks = async () => {
+    setSavingLinks(true);
+    try {
+      const updatedUser = await updateLinks(user.id, {
+        linkedin: linkedin.trim() || undefined,
+        instagram: instagram.trim() || undefined,
+        facebook: facebook.trim() || undefined,
+      });
+      setUser(updatedUser);
+    } finally {
+      setSavingLinks(false);
+    }
+  };
+
   const pending = quests.filter((q) => q.status === "pending");
 
   return (
@@ -54,6 +78,42 @@ export default function Dashboard() {
       </View>
 
       <ScrollView className="px-6 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
+        <Text className="text-lg font-bold text-gray-900 mb-3">Your links</Text>
+        <Text className="text-xs text-gray-500 mb-2">
+          Shown to people you connect with, and shared via your QR code.
+        </Text>
+        <TextInput
+          value={linkedin}
+          onChangeText={setLinkedin}
+          placeholder="Your LinkedIn URL"
+          autoCapitalize="none"
+          keyboardType="url"
+          className="border border-gray-300 rounded-xl px-4 py-2 mb-2 text-sm"
+        />
+        <TextInput
+          value={instagram}
+          onChangeText={setInstagram}
+          placeholder="Your Instagram URL"
+          autoCapitalize="none"
+          keyboardType="url"
+          className="border border-gray-300 rounded-xl px-4 py-2 mb-2 text-sm"
+        />
+        <TextInput
+          value={facebook}
+          onChangeText={setFacebook}
+          placeholder="Your Facebook URL"
+          autoCapitalize="none"
+          keyboardType="url"
+          className="border border-gray-300 rounded-xl px-4 py-2 mb-3 text-sm"
+        />
+        <Pressable
+          disabled={savingLinks}
+          onPress={handleSaveLinks}
+          className="self-start px-4 py-2 rounded-xl bg-gray-800 mb-8"
+        >
+          <Text className="text-white text-sm font-medium">{savingLinks ? "Saving..." : "Save links"}</Text>
+        </Pressable>
+
         <Text className="text-lg font-bold text-gray-900 mb-3">Your plans</Text>
         {user.plans.length === 0 && <Text className="text-gray-400 mb-3">No plans yet.</Text>}
         <View className="flex-row flex-wrap gap-2 mb-3">

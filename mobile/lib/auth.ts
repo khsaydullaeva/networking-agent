@@ -7,10 +7,14 @@ import { AUTH0_CLIENT_ID, AUTH0_DOMAIN } from "@/lib/config";
 WebBrowser.maybeCompleteAuthSession();
 
 /**
- * Logs in via Auth0 Universal Login with LinkedIn forced as the social
- * connection (see backend/README.md §6 — LinkedIn must be enabled as a
- * social connection in the Auth0 dashboard first). Returns the resulting
+ * Signs up / logs in via Auth0's standard Universal Login (whatever
+ * connections are enabled on the tenant — email/password by default,
+ * plus any social connections you've turned on). Returns the resulting
  * ID token, which backend/'s POST /auth/session verifies.
+ *
+ * Profile links (LinkedIn, Instagram, Facebook, ...) are entered
+ * manually after login, on the dashboard — see app/dashboard.tsx — not
+ * pulled from a specific social login provider.
  */
 export function useAuth0Login() {
   const discovery = AuthSession.useAutoDiscovery(`https://${AUTH0_DOMAIN}`);
@@ -20,7 +24,6 @@ export function useAuth0Login() {
       clientId: AUTH0_CLIENT_ID,
       redirectUri,
       scopes: ["openid", "profile", "email"],
-      extraParams: { connection: "linkedin" },
     },
     discovery
   );

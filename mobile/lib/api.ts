@@ -1,7 +1,7 @@
 import { BACKEND_URL, USE_FIXTURES } from "@/lib/config";
 import { seedConnections } from "@/lib/fixtures/seedConnections";
 import { seedQuests } from "@/lib/fixtures/seedQuests";
-import type { Connection, Plan, Quest, User } from "@/lib/types";
+import type { Connection, Links, Plan, Quest, User } from "@/lib/types";
 
 // mobile/ never calls the agent or Querit directly — only backend/, over
 // REST. USE_FIXTURES lets every screen work before backend/ is reachable,
@@ -63,6 +63,17 @@ export async function addPlan(userId: string, title: string): Promise<Plan> {
   return request<Plan>(`/users/${userId}/plans`, {
     method: "POST",
     body: JSON.stringify({ title }),
+  });
+}
+
+export async function updateLinks(userId: string, links: Links): Promise<User> {
+  if (USE_FIXTURES) {
+    fixtureUser = { ...fixtureUser, links: { ...fixtureUser.links, ...links } };
+    return fixtureUser;
+  }
+  return request<User>(`/users/${userId}/links`, {
+    method: "POST",
+    body: JSON.stringify(links),
   });
 }
 

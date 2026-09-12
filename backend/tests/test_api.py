@@ -50,6 +50,21 @@ def test_add_plan_to_user(client):
     assert fetched["plans"][0]["id"] == plan["id"]
 
 
+def test_update_own_profile_links_merges_partial(client):
+    user = client.post("/users", json={"name": "Alice", "goals": [], "links": {}}).json()
+
+    first = client.post(f"/users/{user['id']}/links", json={"linkedin": "https://linkedin.com/in/alice"})
+    assert first.status_code == 200
+    assert first.json()["links"]["linkedin"] == "https://linkedin.com/in/alice"
+
+    # setting instagram shouldn't clobber the linkedin set above
+    second = client.post(f"/users/{user['id']}/links", json={"instagram": "https://instagram.com/alice"})
+    assert second.status_code == 200
+    links = second.json()["links"]
+    assert links["linkedin"] == "https://linkedin.com/in/alice"
+    assert links["instagram"] == "https://instagram.com/alice"
+
+
 def test_list_quests_and_link_to_plan(client):
     user = client.post("/users", json={"name": "Bob", "goals": ["Cofounder"], "links": {}}).json()
     plan_id = user["plans"][0]["id"]

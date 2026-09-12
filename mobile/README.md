@@ -18,10 +18,11 @@ another teammate's server being up.
 - NativeWind (Tailwind for RN) for styling
 - `expo-camera` — QR generate + scan
 - `expo-location` — GPS capture on connect
-- `expo-av` — voice note recording (upload as file, backend transcribes or
-  stores raw — confirm with P3/P4 which)
-- `expo-auth-session` + `expo-web-browser` — Auth0 Universal Login with
-  LinkedIn as the social connection (see §7 — wired in for real, not a stub)
+- `expo-audio` — voice note recording (upload as file, backend transcribes or
+  stores raw — confirm with P3/P4 which). Not `expo-av`: that package's
+  native module isn't bundled in Expo Go on current SDKs.
+- `expo-auth-session` + `expo-web-browser` — Auth0 Universal Login,
+  standard sign up / sign in (see §7 — wired in for real, not a stub)
 - `expo-secure-store` — persists the logged-in session across app restarts
 - State: React Context + `useReducer`, or Zustand if the team prefers —
   don't reach for Redux, there isn't time
@@ -41,17 +42,19 @@ classic multi-hour time sink.
 
 ## 2. Screens (build in this order)
 
-1. **Login** — "Continue with LinkedIn" (Auth0 Universal Login, LinkedIn
-   forced as the social connection). Persists the session so a relaunch
-   skips straight past this. See §7.
+1. **Login** — "Sign up / Log in" via Auth0's standard Universal Login
+   (email/password by default, plus any social connections you enable —
+   no specific provider forced). Persists the session so a relaunch skips
+   straight past this. See §7.
 2. **Plans setup** — shown once, right after a login that has zero plans.
    Add 1+ "improvement plans" (root README.md §3) — chips for common ones
    plus free text. Blocks continuing until at least one plan exists.
 3. **Connect** — big QR code (encodes your `user_id`, `name`, and `links`
-   — including your LinkedIn if set) + a "Scan" button that opens the
-   camera. Below the QR, show the 6-digit fallback code and inputs to
-   type the other person's code, name, and LinkedIn URL (camera-under-
-   stage-lights fallback — do not skip this).
+   — including whatever social links you've added on the dashboard) + a
+   "Scan" button that opens the camera. Below the QR, show the 6-digit
+   fallback code and inputs to type the other person's code, name, and
+   LinkedIn/Instagram/Facebook URLs (camera-under-stage-lights fallback —
+   do not skip this).
 4. **Capture context** — appears immediately after a successful connect.
    Auto-fills GPS → place label (reverse geocode or just show raw
    coords + let user label it "Career Fair") and timestamp. One text
@@ -59,8 +62,8 @@ classic multi-hour time sink.
    conference / club / orientation / campus / work / other.
 5. **Connection detail** — shows enrichment once the backend returns it
    (poll or just wait — MVP doesn't need websockets): role, interests,
-   recent activity **with visible source links**, the person's LinkedIn
-   link if captured, and the generated quest cards.
+   recent activity **with visible source links**, the person's captured
+   profile links, and the generated quest cards.
 6. **Quest card** — one of four visual types by `type`:
    - `message`: shows `draft_message`, a "Copy" button, a "Mark sent"
      button
@@ -71,10 +74,13 @@ classic multi-hour time sink.
    animation (see §4) → navigate back to the map.
 7. **Network map** (the demo centerpiece — give this the most polish time)
    — see §4.
-8. **Dashboard** — the feed of every pending follow-up task across all
-   connections (`GET /quests?owner_id=`), plus the user's plans. Tapping
-   a task lets you link it to a plan (`POST /quests/:id/link-plan`) —
-   this is the "connect follow-up tasks to your improvement plans" loop.
+8. **Dashboard** — three things: (a) your own profile links (LinkedIn,
+   Instagram, Facebook — entered manually, `POST /users/:id/links`; this
+   is what gets shared via your QR code and what the agent searches for
+   contacts you add later), (b) your plans, (c) the feed of every pending
+   follow-up task across all connections (`GET /quests?owner_id=`).
+   Tapping a task lets you link it to a plan (`POST /quests/:id/link-plan`)
+   — this is the "connect follow-up tasks to your improvement plans" loop.
 
 Do not build more screens than this for MVP. A settings screen, a search
 screen, a contacts list screen are all cuttable.
@@ -117,8 +123,9 @@ This single screen carries the most weight in judging ("demo quality" +
 
 ```
 POST /auth/session                   — login: get-or-create user from Auth0 ID token
-GET  /users/:id                      — fetch current user (plans, xp)
+GET  /users/:id                      — fetch current user (plans, links, xp)
 POST /users/:id/plans                — add an improvement plan
+POST /users/:id/links                — set your own profile links (LinkedIn/IG/FB/...)
 POST /connections                    — create a connection (triggers agent async)
 GET  /connections/:id                — poll for enrichment + quests
 GET  /connections?owner_id=          — list all, for the map
@@ -140,20 +147,25 @@ safety net (coordinate with `backend/README.md` §5 `DEMO_MODE`).
 
 ---
 
-## 7. Auth0 — LinkedIn login, wired in for real
+## 7. Auth0 — sign up / log in, wired in for real
 
-`lib/auth.ts`'s `useAuth0Login()` hook drives Auth0 Universal Login via
-`expo-auth-session`, with `extraParams: { connection: "linkedin" }` so the
-provider picker is skipped and the user goes straight to LinkedIn. On
+`lib/auth.ts`'s `useAuth0Login()` hook drives Auth0's standard Universal
+Login via `expo-auth-session` — no social connection is forced, so it's
+whatever's enabled on your tenant (email/password out of the box). On
 success it exchanges the code for tokens and returns the ID token, which
 `lib/store.tsx`'s `login()` sends to `POST /auth/session` and persists
 (via `expo-secure-store`) alongside the returned user.
 
-**One manual step required on your end**: enable LinkedIn as a social
-connection in the Auth0 dashboard (Authentication → Social → LinkedIn) —
-see `backend/README.md` §6. Until that's done, "Continue with LinkedIn"
-will reach Auth0's Universal Login page and fail there with a
-connection-not-enabled error; that's expected, not a bug in this code.
+This needs zero Auth0 dashboard configuration beyond creating the
+application — the redirect URI does need to be added to **Allowed
+Callback URLs** the first time you run it on a new dev machine/network
+(the login screen shows the exact value — tap to copy — if you hit a
+"Callback URL mismatch" error).
+
+Profile links (LinkedIn, Instagram, Facebook) are **not** tied to login —
+they're entered manually after signing in, on the dashboard's "Your
+links" section (`POST /users/:id/links`), same pattern as capturing a
+*contact's* links on the connect screen.
 
 Every screen behind login (`/plans-setup`, `/map`, `/connect`, `/capture`,
 `/connection/:id`, `/dashboard`) redirects to `/login` if `useStore().user`
@@ -161,7 +173,7 @@ is null — see each screen's top-level `if (!user) return <Redirect .../>`.
 
 Set `EXPO_PUBLIC_USE_FIXTURES=true` to bypass real login entirely via the
 "Continue as dev user (fixtures)" button on the login screen — useful for
-testing plans/dashboard/connect before LinkedIn is enabled in Auth0.
+testing plans/dashboard/connect without a live Auth0 tenant at all.
 
 ---
 
@@ -182,7 +194,10 @@ testing plans/dashboard/connect before LinkedIn is enabled in Auth0.
 - [ ] Session persists across an app restart (no re-login needed)
 - [ ] A first-time login with zero plans is routed to `/plans-setup`
       before `/map`
-- [ ] The other person's LinkedIn URL (from the QR payload or typed
-      manually) shows as a tappable link on Connection detail
+- [ ] The other person's profile links (from the QR payload or typed
+      manually) show as tappable links on Connection detail
 - [ ] Dashboard lists every pending task across all connections, and
       linking one to a plan persists (reload and it's still linked)
+- [ ] Saving your own links on the dashboard persists (reload and
+      they're still there) and shows up in your QR code for the next
+      person you connect with

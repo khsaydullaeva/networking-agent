@@ -170,19 +170,32 @@ before you go on stage.
 
 ---
 
-## 6. Auth0 — LinkedIn login
+## 6. Auth0 — sign up / log in, then add profile links manually
 
 `app/auth.py`'s `verify_token` dependency verifies an Auth0-issued ID
 token (RS256, signature checked against `https://$AUTH0_DOMAIN/.well-known/jwks.json`,
 `aud` checked against `AUTH0_CLIENT_ID`). `POST /auth/session` is the only
-endpoint that uses it today — mobile logs in via Auth0 Universal Login
-with LinkedIn as the social connection, then sends the resulting ID token
-as the bearer token to get-or-create its user row.
+endpoint that uses it today — mobile logs in via Auth0's standard
+Universal Login (email/password out of the box, plus whatever social
+connections you enable — no specific provider is forced), then sends the
+resulting ID token as the bearer token to get-or-create its user row.
 
-**One manual step required**: enable LinkedIn as a social connection in
-your Auth0 dashboard (Authentication → Social → LinkedIn) — this backend
-code doesn't need separate LinkedIn API credentials, Auth0 handles that
-once the connection is turned on.
+This works with zero Auth0 dashboard configuration beyond creating the
+application itself — the default database (email/password) connection is
+enabled on every new Auth0 tenant.
+
+A user's own profile links (LinkedIn, Instagram, Facebook, ...) are
+**not** pulled from a social login provider — they're entered manually
+after login via `POST /users/:id/links` (mobile: the "Your links" section
+on the dashboard). This mirrors how a *contact's* links are captured
+manually on the connect screen (root README.md §1) and is what the agent
+searches directly for enrichment (`agent/README.md` §3).
+
+### `POST /users/:id/links`
+```jsonc
+// request: { "linkedin": "url", "instagram": "url", "facebook": "url", ... }  — any subset
+// response: full user object with links merged in (omitted fields left untouched)
+```
 
 Every other endpoint still takes a plain `owner_id`/`user_id` string, not
 `Depends(verify_token)` — mobile passes whatever id `POST /auth/session`

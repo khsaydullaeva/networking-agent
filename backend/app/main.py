@@ -8,7 +8,7 @@ from .agent_client import enrich_and_generate_quests
 from .auth import verify_token
 from .db import get_db, serialize
 from .demo_fixtures import DEMO_ENRICHMENT, DEMO_QUESTS
-from .models import ConnectionCreate, LinkQuestToPlan, PlanCreate, UserCreate
+from .models import ConnectionCreate, LinkQuestToPlan, Links, PlanCreate, UserCreate
 from .warmth import warmth_for_connection
 
 app = FastAPI(title="Networking Agent Backend")
@@ -87,6 +87,22 @@ async def create_plan(user_id: str, body: PlanCreate):
     plans = user.get("plans", []) + [plan]
     await db.users.update_one({"_id": user_id}, {"$set": {"plans": plans}})
     return plan
+
+
+@app.post("/users/{user_id}/links")
+async def update_links(user_id: str, body: Links):
+    """Sets the logged-in user's own profile links (LinkedIn, Instagram,
+    Facebook, ...), entered manually post-login rather than pulled from a
+    specific social login provider. Merges into existing links -- an
+    omitted field here leaves that link untouched."""
+    db = get_db()
+    user = await db.users.find_one({"_id": user_id})
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    merged = {**user.get("links", {}), **body.model_dump(exclude_none=True)}
+    await db.users.update_one({"_id": user_id}, {"$set": {"links": merged}})
+    updated = await db.users.find_one({"_id": user_id})
+    return serialize(updated)
 
 
 async def _run_enrichment(connection_id: str):
