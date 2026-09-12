@@ -1,16 +1,3 @@
-QUERY_PLAN_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "queries": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 3,
-            "items": {"type": "string"},
-        }
-    },
-    "required": ["queries"],
-}
-
 FACTS_SCHEMA = {
     "type": "object",
     "properties": {

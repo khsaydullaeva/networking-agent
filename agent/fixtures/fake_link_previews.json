@@ -1,0 +1,22 @@
+{
+  "https://github.com/avachen": {
+    "title": "avachen (Ava Chen) · GitHub",
+    "snippet": "Ava Chen maintains kv-cache-compress, a library for compressing KV-cache in transformer inference, and recently published a paper on sparse routing for LLM inference."
+  },
+  "https://linkedin.com/in/marcusreyes": {
+    "title": "Marcus Reyes — Search Engineer at Querit.ai | LinkedIn",
+    "snippet": "Marcus Reyes gave a talk last month on real-time web search APIs for agents and shipped a new ranking model for Querit's search endpoint."
+  },
+  "https://twitter.com/priyanair": {
+    "title": "Priya Nair (@priyanair) / X",
+    "snippet": "Wrote a blog post on vector search indexes in Atlas and spoke on a panel about database scaling for AI workloads."
+  },
+  "https://github.com/dalvarez": {
+    "title": "dalvarez (Diego Alvarez) · GitHub",
+    "snippet": "Diego Alvarez released a benchmark suite comparing small vs. large model routing and co-authored a blog post on the K2 Horizon model fleet."
+  },
+  "https://linkedin.com/in/sofiakim": {
+    "title": "Sofia Kim — Solutions Engineer at Vultr | LinkedIn",
+    "snippet": "Published a guide on deploying FastAPI apps to Vultr and organized a campus hackathon workshop on cloud infra."
+  }
+}

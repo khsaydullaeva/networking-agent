@@ -16,8 +16,8 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 def load_fixtures():
     people = json.loads((FIXTURES_DIR / "fake_people.json").read_text())
-    search_results = json.loads((FIXTURES_DIR / "fake_search_results.json").read_text())
-    return people, search_results
+    link_previews = json.loads((FIXTURES_DIR / "fake_link_previews.json").read_text())
+    return people, link_previews
 
 
 @pytest.fixture(autouse=True)
@@ -27,28 +27,23 @@ def patch_llm(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def patch_querit(monkeypatch):
-    _, search_results = load_fixtures()
+def patch_link_fetch(monkeypatch):
+    _, link_previews = load_fixtures()
 
-    async def fake_search(query: str):
-        # Every fixture query returns the same result set for its person in
-        # this simplified harness — good enough to validate the pipeline
-        # shape end-to-end without a real Querit call.
-        return search_results.get(fake_search.current_person, [])
+    async def fake_fetch(url: str):
+        preview = link_previews.get(url)
+        return {"url": url, **preview} if preview else None
 
-    monkeypatch.setattr(enrichment, "querit_search", fake_search)
-    fake_search.current_person = None
-    return fake_search
+    monkeypatch.setattr(enrichment, "fetch_link_preview", fake_fetch)
 
 
 @pytest.mark.anyio
-async def test_at_least_three_of_five_profiles_produce_specific_quests(patch_querit):
+async def test_at_least_three_of_five_profiles_produce_specific_quests():
     people, _ = load_fixtures()
     specific_count = 0
 
     for entry in people:
         person = entry["person"]
-        patch_querit.current_person = person["name"]
 
         enrichment_result = await enrichment.enrich(
             person, {"context_type": "conference", "place_label": "Career Fair"}
@@ -67,6 +62,17 @@ async def test_at_least_three_of_five_profiles_produce_specific_quests(patch_que
         specific_count += 1
 
     assert specific_count >= 3
+
+
+@pytest.mark.anyio
+async def test_no_links_means_no_facts():
+    """The whole point of the links-only pipeline: a contact with no
+    shared links gets no enrichment, not a generic name-based guess."""
+    result = await enrichment.enrich(
+        {"name": "Nobody Given Links", "org": "", "links": {}},
+        {"context_type": "other"},
+    )
+    assert result["facts"] == []
 
 
 @pytest.fixture

@@ -8,7 +8,7 @@
 
 Hackathon: HackCMU (MLH). Track: **Multiplayer / Touch the Grass** (optionally
 combined with **Institute of Foundation Models (IFM)**). Sponsors targeted:
-**IFM**, **Querit.ai**, ElevenLabs, Auth0, Vultr.
+**IFM**, ElevenLabs, Auth0, Vultr.
 
 This is the root README. Each implementation layer has its own README meant
 to be dropped into Claude Code as the working context for that folder. Work
@@ -25,7 +25,8 @@ shared contract between them is the API spec and data model below.
 2. Context is auto-captured: GPS → place label, timestamp, plus a typed or
    voice note ("met at career fair, works on inference optimization").
 3. Backend triggers the agent, which:
-   - searches the web (Querit) for the new contact,
+   - fetches the profile links shared for the new contact (LinkedIn,
+     Instagram, Facebook, ... — no general web search by name),
    - extracts facts with a source URL attached to each one,
    - generates 2–3 concrete, dated follow-up quests.
 4. Quests render as cards (`message` / `read` / `meet` / `share`) on the
@@ -57,8 +58,8 @@ before cutting these:
                                              │                                  │
                                              ▼                                  ▼
                                       ┌─────────────┐                   ┌───────────────┐
-                                      │ PostgreSQL  │                   │ Querit.ai      │
-                                      │ (JSONB)     │                   │ (search)       │
+                                      │ PostgreSQL  │                   │ Shared profile │
+                                      │ (JSONB)     │                   │ links (fetch)  │
                                       └─────────────┘                   │ LLM provider   │
                                                                          │ (K2/Gemini/    │
                                                                          │  Grok — see    │
@@ -66,7 +67,7 @@ before cutting these:
                                                                          └───────────────┘
 ```
 
-- `mobile/` never calls the agent or Querit directly — only `backend/`.
+- `mobile/` never calls the agent directly — only `backend/`.
 - `backend/` never calls the LLM directly — only `agent/` does, through the
   provider abstraction, so the model can change without touching backend
   or mobile code at all.
@@ -150,7 +151,6 @@ Full JSON Schemas for what the agent must return live in `agent/README.md`.
 |---|---|---|
 | `DATABASE_URL` | backend | Postgres connection string (Neon/Supabase/Railway/Vultr) |
 | `BACKEND_URL` | mobile | e.g. `http://<laptop-ip>:8000` for Expo Go on physical devices |
-| `QUERIT_API_KEY` | agent | https://www.querit.ai/en/dashboard |
 | `LLM_PROVIDER` | agent | `k2` \| `gemini` \| `grok` — see `agent/README.md` |
 | `LLM_API_KEY` | agent | key for whichever provider is active |
 | `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` | mobile, backend | sign up / log in — works out of the box with Auth0's default email/password connection, see backend/README §6 |
@@ -165,7 +165,7 @@ Full JSON Schemas for what the agent must return live in `agent/README.md`.
 | P1 | `mobile/` (shell: QR, connect flow, capture) | Hour 0 | nothing — build against mocked backend responses first |
 | P2 | `mobile/` (gamified UI: map, quest cards, XP) | Hour 0 | nothing — build against seed/fixture data first |
 | P3 | `backend/` | Hour 0 | nothing — Auth0 goes in last, ~hour 18-20 |
-| P4 | `agent/` | Hour 0 | nothing — build against 5 hand-written fake profiles before touching real Querit/LLM calls |
+| P4 | `agent/` | Hour 0 | nothing — build against 5 hand-written fake profiles before touching real LLM calls |
 
 **Hour 10 checkpoint:** two phones connecting must produce a real row in
 Postgres. If this isn't true, stop everything else and fix only this.

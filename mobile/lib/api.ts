@@ -3,9 +3,9 @@ import { seedConnections } from "@/lib/fixtures/seedConnections";
 import { seedQuests } from "@/lib/fixtures/seedQuests";
 import type { Connection, Links, Plan, Quest, User } from "@/lib/types";
 
-// mobile/ never calls the agent or Querit directly — only backend/, over
-// REST. USE_FIXTURES lets every screen work before backend/ is reachable,
-// and doubles as the wifi-outage demo safety net.
+// mobile/ never calls the agent directly — only backend/, over REST.
+// USE_FIXTURES lets every screen work before backend/ is reachable, and
+// doubles as the wifi-outage demo safety net.
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(`${BACKEND_URL}${path}`, {

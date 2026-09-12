@@ -1,5 +1,5 @@
 """Pre-written enrichment/quests served instantly by DEMO_MODE, so a demo
-never depends on venue wifi, Querit, or the LLM provider being reachable."""
+never depends on venue wifi or the LLM provider being reachable."""
 
 DEMO_ENRICHMENT = {
     "role": "Software Engineer",

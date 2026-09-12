@@ -5,8 +5,9 @@ Read the root `README.md` first for the shared data model — this file does
 not repeat it, only extends it with endpoint contracts.
 
 This layer **owns the database** and **owns calling the agent**. It never
-talks to Querit or an LLM provider directly — all of that is delegated to
-`agent/`, imported as a module or called as a separate local service (your
+talks to an LLM provider directly, or fetches profile links itself — all
+of that is delegated to `agent/`, imported as a module or called as a
+separate local service (your
 call; a local Python import is simplest for a hackathon, avoid the
 overhead of a second HTTP hop unless the agent team wants process
 isolation).
@@ -163,8 +164,8 @@ less than the decay being visible on stage.
 ## 5. Demo-mode safety net
 
 Add `DEMO_MODE` env var. When true, `/connections` and `/quests` skip the
-real agent call and Querit round trip entirely and return pre-written
-fixture enrichment/quests instantly. This is your insurance against venue
+real agent call entirely and return pre-written fixture enrichment/quests
+instantly. This is your insurance against venue
 wifi dying mid-demo — test this path the night before, not five minutes
 before you go on stage.
 
@@ -213,7 +214,7 @@ per-request authorization beyond "the client already logged in once."
 - [ ] Warmth values visibly differ across connections with different
       `last_touch` and `context_type`
 - [ ] `DEMO_MODE=true` produces a full working response with zero network
-      calls to Querit or the LLM provider
+      calls to any profile link or the LLM provider
 - [ ] Reachable from a physical phone on the same wifi network as your
       laptop (test this explicitly — `localhost` bindings are a common trap)
 - [ ] Agent failures degrade to a fallback quest, never a 500 to mobile

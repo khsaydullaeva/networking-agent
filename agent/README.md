@@ -20,7 +20,9 @@ any pipeline logic.
   exposes an OpenAI-compatible endpoint, since one client can serve
   multiple providers
 - `pydantic` v2 for schema validation of LLM outputs
-- Querit.ai for search (`https://api.querit.ai/v1/search`)
+- No general web search — enrichment only fetches the profile links the
+  person shared and extracts whatever public preview content is there
+  (see §3). No Querit or other search API dependency.
 - No LangChain / agent framework — for a 24h hackathon, hand-rolled
   pipelines are faster to debug at 3am than a framework's abstractions
 
@@ -158,57 +160,78 @@ development, don't assume it works untested.
 
 ## 3. Pipeline A — Enrichment
 
+**No web search.** Enrichment only extracts facts from the profile links
+the person shared (LinkedIn, Instagram, Facebook, ... — captured manually
+on the connect screen, `mobile/README.md` §2.3). A contact with no links
+gets no enrichment; that's intentional, not a bug to route around with a
+name-based search fallback.
+
 ```python
 async def enrich(person: dict, met_context: dict) -> dict:
+    links = [url for url in person.get("links", {}).values() if url]
+    if not links:
+        return {"facts": []}
+
     llm = get_llm()
 
-    # 1. Plan 2-3 search queries
-    queries = await llm.generate_json(
-        system_prompt=PLAN_QUERIES_PROMPT,
-        user_prompt=json.dumps({"person": person, "context": met_context}),
-        schema=QUERY_PLAN_SCHEMA,   # {"queries": ["string", "string", "string"]}
-    )
+    # 1. Fetch each link's public preview markup (Open Graph / meta tags —
+    # see fetch_link_preview below), in parallel.
+    previews = await asyncio.gather(*[fetch_link_preview(u) for u in links])
+    clean_previews = [p for p in previews if p]
+    if not clean_previews:
+        return {"facts": []}
 
-    # 1b. Any profile links the user typed in manually on the connect
-    # screen (LinkedIn, Instagram, Facebook, ...) are searched directly
-    # too — a provided link is a lead, not a trusted source, so it still
-    # goes through the same verification in step 4.
-    all_queries = queries["queries"] + [u for u in person.get("links", {}).values() if u]
-
-    # 2. Querit search, in parallel
-    results = await asyncio.gather(*[querit_search(q) for q in all_queries])
-
-    # 3. Extract facts per result, LLM call per result (or batch if provider allows)
+    # 2. Extract facts per preview, one LLM call per link.
     facts = []
-    for query, result_set in zip(all_queries, results):
+    for preview in clean_previews:
         extracted = await llm.generate_json(
             system_prompt=EXTRACT_FACTS_PROMPT,
-            user_prompt=json.dumps({"query": query, "results": result_set}),
+            user_prompt=json.dumps({"query": preview["url"], "results": [preview]}),
             schema=FACTS_SCHEMA,   # {"facts": [{"fact": str, "source_url": str, "date": str|null}]}
         )
         facts.extend(extracted["facts"])
 
-    # 4. HARD RULE: drop any fact without a source_url that traces to an actual
-    # result URL from step 2. Do not trust the LLM's self-reported source_url —
-    # verify it appears in the search results you actually retrieved.
-    verified = [f for f in facts if f["source_url"] in {r["url"] for rs in results for r in rs}]
+    # 3. HARD RULE: drop any fact whose source_url isn't one of the links we
+    # actually fetched. Do not trust the LLM's self-reported source_url.
+    verified = [f for f in facts if f["source_url"] in {p["url"] for p in clean_previews}]
 
     return {"facts": verified[:6]}  # cap for quest-generation prompt size
 ```
 
-### `querit_search`
+### `fetch_link_preview` — and its real, tested limit
 
 ```python
-async def querit_search(query: str) -> list[dict]:
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(
-            "https://api.querit.ai/v1/search",
-            headers={"Authorization": f"Bearer {os.environ['QUERIT_API_KEY']}"},
-            json={"query": query, "count": 5},
-        )
+async def fetch_link_preview(url: str) -> dict | None:
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True,
+                                  headers={"User-Agent": "<a real browser UA>"}) as client:
+        resp = await client.get(url)
         resp.raise_for_status()
-        return resp.json()["results"]["result"]
+        html = resp.text
+    # parse <meta property="og:title">, og:description, <title> …
+    # returns None if nothing usable was found
 ```
+
+**Tested against the real platforms, and the result matters for what this
+feature can actually promise:**
+
+| Platform | Result |
+|---|---|
+| LinkedIn | Blocks unauthenticated requests — `fetch_link_preview` returns `None` |
+| Facebook | Same — `None` |
+| Instagram | Returns a generic `"Instagram"` title with no profile-specific content (the real markup is filled in by client-side JS, which a plain HTTP GET never executes) |
+
+In practice, right now, this pipeline usually returns **no facts** for
+LinkedIn/Instagram/Facebook links specifically — a plain HTTP fetch simply
+doesn't get past these platforms' login walls / bot detection / JS
+rendering. This is not a bug to silently patch around with a fallback
+search; if that fallback matters to the product, it needs an explicit
+decision (see the note at the top of this file or ask before building
+around it) since it reintroduces exactly what "no web search" ruled out,
+and any deeper scraping (headless browser, session cookies) raises real
+LinkedIn/Meta ToS questions worth deciding deliberately, not by default.
+
+Links to platforms that render server-side HTML (GitHub profiles, most
+personal sites, many blogs) work fine with this approach today.
 
 ---
 
@@ -284,12 +307,12 @@ Confirm exact model identifiers in IFM's docs at hackathon time; names in
 ## 6. Test fixtures — build against these before touching real APIs
 
 Create `agent/fixtures/fake_people.json` with 5 hand-written profiles
-(name, org, a couple of "known facts" you invent) and
-`agent/fixtures/fake_search_results.json` with plausible Querit-shaped
-responses for them. Build and debug both pipelines end-to-end against
-fixtures first; only swap in real Querit + LLM calls once the JSON
-contracts are solid. This unblocks `backend/` from ever waiting on your
-API keys working.
+(name, org, a link or two, a couple of "known facts" you invent) and
+`agent/fixtures/fake_link_previews.json` keyed by URL with plausible
+`fetch_link_preview`-shaped responses (`{"title", "snippet"}`) for them.
+Build and debug both pipelines end-to-end against fixtures first; only
+swap in real LLM calls once the JSON contracts are solid. This unblocks
+`backend/` from ever waiting on your API keys working.
 
 ---
 
@@ -298,9 +321,9 @@ API keys working.
 - [ ] Swapping `LLM_PROVIDER` between `k2`, `gemini`, `grok` requires no
       code change, only env var + restart — test this at least once
 - [ ] No file outside `agent/llm/factory.py` branches on provider name
-- [ ] Every fact in enrichment output has a `source_url` that matches a
-      real Querit result URL (verified programmatically, not just
-      requested in the prompt)
+- [ ] Every fact in enrichment output has a `source_url` that matches one
+      of the profile links actually fetched (verified programmatically,
+      not just requested in the prompt)
 - [ ] Malformed LLM JSON triggers one retry, then a fallback — never an
       unhandled exception surfaced to `backend/`
 - [ ] At least 3 of 5 fixture profiles produce quests where `why_now`

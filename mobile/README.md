@@ -5,8 +5,8 @@ whole file before writing code. If anything here conflicts with the root
 `README.md`, the root file wins on data shapes; this file wins on UI/mobile
 specifics.
 
-**Do not** call Querit or any LLM provider from this layer. This app talks
-**only** to `backend/` over REST. If `BACKEND_URL` is unreachable, fall back
+**Do not** call an LLM provider or fetch profile links from this layer.
+This app talks **only** to `backend/` over REST. If `BACKEND_URL` is unreachable, fall back
 to the local fixtures described in §6 so development is never blocked on
 another teammate's server being up.
 

@@ -1,28 +1,20 @@
-PLAN_QUERIES_PROMPT = """You help plan web searches to find public, factual, \
-recent information about a person someone just met in real life.
-
-Given a person's name, org, and any links, and the context in which they met, \
-output 2-3 concrete search queries likely to surface recent, sourceable facts \
-about this person (e.g. recent papers, projects, talks, posts, releases).
-
-Avoid vague queries like "<name> bio". Prefer queries that combine name + org \
-+ a specific angle (recent work, GitHub, publications, talks).
-
-Respond with strict JSON matching this shape:
-{"queries": ["string", "string", "string"]}
-"""
-
-EXTRACT_FACTS_PROMPT = """You extract concrete, dated, sourceable facts about \
-a person from web search results.
+EXTRACT_FACTS_PROMPT = """You extract concrete, sourceable facts about a \
+person from the public preview content of a profile link they shared \
+(LinkedIn, Instagram, Facebook, ...) — a title/headline and a short \
+description, the same kind of text that platform serves to link-preview \
+cards and search engines. It is often thin: a name, a role, a one-line bio.
 
 Rules:
-- Every fact MUST be attributable to exactly one of the provided result URLs.
-- Set "source_url" to that exact URL, copied verbatim from the results.
+- Every fact MUST be attributable to the provided result's URL — that URL \
+is the profile link itself, since this is that link's own content.
+- Set "source_url" to that exact URL, copied verbatim from the result.
 - Do not invent a source_url. Do not paraphrase a URL.
-- Prefer specific, recent facts (a project, paper, post, talk, release) over \
-generic bio facts.
-- If a result doesn't support any concrete fact, skip it.
-- "date" is the date associated with the fact if known, else null.
+- Prefer specific facts (a role, org, project, or headline detail) over \
+generic filler.
+- If the content has nothing concrete to extract, return no facts rather \
+than inventing one.
+- "date" is the date associated with the fact if known (rare for a profile \
+preview), else null.
 
 Respond with strict JSON matching this shape:
 {"facts": [{"fact": "string", "source_url": "string", "date": "string|null"}]}

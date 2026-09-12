@@ -1,5 +1,5 @@
-"""API tests run against DEMO_MODE (zero network calls to Querit/LLM) and
-the in-memory db fallback (no Atlas needed).
+"""API tests run against DEMO_MODE (zero network calls to the agent's LLM
+or link fetching) and the in-memory db fallback (no Atlas needed).
 
 Run with: DEMO_MODE=true python -m pytest backend/tests/test_api.py -v
 """

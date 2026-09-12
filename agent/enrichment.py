@@ -1,56 +1,42 @@
 import asyncio
 import json
 
+from .link_fetch import fetch_link_preview
 from .llm.factory import get_llm
-from .prompts import EXTRACT_FACTS_PROMPT, PLAN_QUERIES_PROMPT
-from .querit import querit_search
+from .prompts import EXTRACT_FACTS_PROMPT
 from .retry import with_one_retry
-from .schemas import FACTS_SCHEMA, QUERY_PLAN_SCHEMA
+from .schemas import FACTS_SCHEMA
 
 MAX_FACTS = 6
 
 
 async def enrich(person: dict, met_context: dict) -> dict:
-    """Searches the web for `person` and returns verified, sourced facts.
+    """Extracts facts from the profile links the person shared (LinkedIn,
+    Instagram, Facebook, ...) — no generic web search by name. If they
+    didn't share any links, there's nothing to enrich from and this
+    returns no facts; the mobile connect screen is where links get
+    captured (root README.md §1).
 
-    Never raises: LLM failures fall back to an empty query plan / fact list
-    so a bad LLM response degrades enrichment quality, not availability.
+    Never raises: a fetch or LLM failure for one link just means fewer
+    facts, not a broken connection.
     """
-    llm = get_llm()
-
-    queries = await with_one_retry(
-        lambda: llm.generate_json(
-            system_prompt=PLAN_QUERIES_PROMPT,
-            user_prompt=json.dumps({"person": person, "context": met_context}),
-            schema=QUERY_PLAN_SCHEMA,
-        ),
-        fallback={"queries": []},
-    )
-
-    # Any profile links the user typed in manually (LinkedIn, Instagram,
-    # Facebook, ...) are searched directly too, so enrichment can ground
-    # facts in the specific profile provided rather than only guessing
-    # from name + org. These flow through the same verification below as
-    # ordinary queries — a provided link is a lead, not a trusted source.
-    link_queries = [url for url in person.get("links", {}).values() if url]
-    all_queries = queries["queries"] + link_queries
-    if not all_queries:
+    links = [url for url in person.get("links", {}).values() if url]
+    if not links:
         return {"facts": []}
 
-    results = await asyncio.gather(
-        *[querit_search(q) for q in all_queries], return_exceptions=True
-    )
-    # A failed search for one query shouldn't sink the others.
-    clean_results = [r if isinstance(r, list) else [] for r in results]
+    llm = get_llm()
+
+    previews = await asyncio.gather(*[fetch_link_preview(u) for u in links], return_exceptions=True)
+    clean_previews = [p for p in previews if isinstance(p, dict)]
+    if not clean_previews:
+        return {"facts": []}
 
     facts: list[dict] = []
-    for query, result_set in zip(all_queries, clean_results):
-        if not result_set:
-            continue
+    for preview in clean_previews:
         extracted = await with_one_retry(
-            lambda q=query, rs=result_set: llm.generate_json(
+            lambda p=preview: llm.generate_json(
                 system_prompt=EXTRACT_FACTS_PROMPT,
-                user_prompt=json.dumps({"query": q, "results": rs}),
+                user_prompt=json.dumps({"query": p["url"], "results": [p]}),
                 schema=FACTS_SCHEMA,
             ),
             fallback={"facts": []},
@@ -58,8 +44,8 @@ async def enrich(person: dict, met_context: dict) -> dict:
         facts.extend(extracted["facts"])
 
     # HARD RULE: never trust the LLM's self-reported source_url — verify it
-    # appears in the search results actually retrieved.
-    known_urls = {r["url"] for rs in clean_results for r in rs}
+    # is one of the links we actually fetched.
+    known_urls = {p["url"] for p in clean_previews}
     verified = [f for f in facts if f["source_url"] in known_urls]
 
     return {"facts": verified[:MAX_FACTS]}
